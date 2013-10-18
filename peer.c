@@ -64,16 +64,26 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 	 ntohs(from.sin_port),
 	 buf);
   
-  //TODO: process UDP request
-  //TODO: process WHOHAS --> send IHAVE
-  //TODO: process IHAVE
+  //TODO(David): process UDP request
+  switch(process_udp(buf)) {
+    case TYPE_WHOHAS:
+      //TODO(Chris): process WHOHAS
+        //TODO(David): send IHAVE
+      break;
+    case TYPE_IHAVE:    
+      //TODO(David): process IHAVE
+      break;
+    default:
+      // Not yet implemented
+      break;
+  }
 }
 
 void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
 	chunkfile, outputfile);
   
-  //TODO: send WHOHAS
+  //TODO(Chris): send WHOHAS
 }
 
 void handle_user_input(char *line, void *config) {
