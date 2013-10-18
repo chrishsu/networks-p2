@@ -18,6 +18,11 @@ typedef struct {
     char *buf;
 } peer_header;
 
+typedef struct chunk_list {
+    char hash[20];
+    struct chunk_list *next;
+} chunk_list;
+
 /*
  * @returns The type of request, or -1 if invalid type.
  */
