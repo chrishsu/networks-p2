@@ -23,6 +23,10 @@ typedef struct chunk_list {
     struct chunk_list *next;
 } chunk_list;
 
+chunk_list *init_chunk_list();
+chunk_list *add_chunk_to_list(chunk_list *list, char *hash);
+void del_chunk_list(chunk_list *list);
+
 /*
  * @returns The type of request, or -1 if invalid type.
  */
@@ -31,6 +35,6 @@ int process_udp(char *buf);
 /*
  * Creates p2p header and UDP header, then sends the packet.
  */
-int send_udp(int sock, peer_header *h);
+int send_udp(int sock, peer_header *h, void *config);
 
 #endif

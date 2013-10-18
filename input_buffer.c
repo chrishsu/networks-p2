@@ -20,7 +20,7 @@ struct user_iobuf *create_userbuf() {
 }
 
 void process_user_input(int fd, struct user_iobuf *userbuf, 
-			void (*handle_line)(char *, void *), void *cbdata)
+			void (*handle_line)(int, char *, void *), int sock, void *cbdata)
 {
   int nread;
   char *ret;
@@ -34,6 +34,7 @@ void process_user_input(int fd, struct user_iobuf *userbuf,
   if (userbuf->cur >= (USERBUF_SIZE - 1)) {
     fprintf(stderr, "process_user_input error:  buffer full;  line too long!\n");
     exit(-1);
+    //TODO: don't just exit
   }
 
   nread = read(fd, userbuf->buf + userbuf->cur, 
@@ -45,7 +46,7 @@ void process_user_input(int fd, struct user_iobuf *userbuf,
 
  while ((ret = strchr(userbuf->buf, '\n')) != NULL) {
   *ret = '\0';
-  handle_line(userbuf->buf, cbdata);
+  handle_line(sock, userbuf->buf, cbdata);
   /* Shift the remaining contents of the buffer forward */
   memmove(userbuf->buf, ret + 1, USERBUF_SIZE - (ret - userbuf->buf));
   userbuf->cur -= (ret - userbuf->buf + 1);

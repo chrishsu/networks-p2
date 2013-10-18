@@ -79,14 +79,15 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   }
 }
 
-void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
+void process_get(int sock, char *chunkfile, char *outputfile, bt_config_t *config) {
   printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
 	chunkfile, outputfile);
   
   //TODO(Chris): send WHOHAS
+  send_whohas(sock, chunkfile, config);
 }
 
-void handle_user_input(char *line, void *config) {
+void handle_user_input(int sock, char *line, void *config) {
   char chunkf[128], outf[128];
 
   bzero(chunkf, sizeof(chunkf));
@@ -94,7 +95,7 @@ void handle_user_input(char *line, void *config) {
 
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      process_get(chunkf, outf, (bt_config_t)config);
+      process_get(sock, chunkf, outf, (bt_config_t)config);
     }
   }
 }
@@ -141,7 +142,7 @@ void peer_run(bt_config_t *config) {
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
-        process_user_input(STDIN_FILENO, userbuf, handle_user_input, config);
+        process_user_input(STDIN_FILENO, userbuf, handle_user_input, sock, config);
       }
     }
   }
