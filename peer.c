@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 }
 
 
-void process_inbound_udp(int sock) {
+void process_inbound_udp(int sock, bt_config_t *config) {
   #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
@@ -63,14 +63,20 @@ void process_inbound_udp(int sock) {
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
 	 buf);
+  
+  //TODO: process UDP request
+  //TODO: process WHOHAS --> send IHAVE
+  //TODO: process IHAVE
 }
 
-void process_get(char *chunkfile, char *outputfile) {
+void process_get(char *chunkfile, char *outputfile, bt_config_t *config) {
   printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n", 
 	chunkfile, outputfile);
+  
+  //TODO: send WHOHAS
 }
 
-void handle_user_input(char *line, void *cbdata) {
+void handle_user_input(char *line, void *config) {
   char chunkf[128], outf[128];
 
   bzero(chunkf, sizeof(chunkf));
@@ -78,7 +84,7 @@ void handle_user_input(char *line, void *cbdata) {
 
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      process_get(chunkf, outf);
+      process_get(chunkf, outf, (bt_config_t)config);
     }
   }
 }
@@ -121,12 +127,11 @@ void peer_run(bt_config_t *config) {
     
     if (nfds > 0) {
       if (FD_ISSET(sock, &readfds)) {
-	process_inbound_udp(sock);
+        process_inbound_udp(sock, config);
       }
       
       if (FD_ISSET(STDIN_FILENO, &readfds)) {
-	process_user_input(STDIN_FILENO, userbuf, handle_user_input,
-			   "Currently unused");
+        process_user_input(STDIN_FILENO, userbuf, handle_user_input, config);
       }
     }
   }
