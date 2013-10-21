@@ -13,8 +13,8 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, void *con
     
     chunks = init_chunk_list();
     next = chunks;
-    //go past UDP header
-    num_chunks = ntohs(h->buf[UDP + h->pack_len]);
+    //get the number of chunks
+    num_chunks = ntohs(h->buf[UDP + h->pack_len]); //correct usage of ntohs?
     OFFSET = UPD + h->pack_len + PAD;
     
     //loop through
