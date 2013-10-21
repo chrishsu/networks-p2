@@ -53,21 +53,26 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
+  peer_header h;
   char buf[BUFLEN];
 
   fromlen = sizeof(from);
   spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+  
+  init_peer_header(&h); //no need to free
+  h.buf = buf;
 
   printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
 	 "Incoming message from %s:%d\n%s\n\n", 
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port),
-	 buf);
+	 h.buf);
   
   //TODO(David): process UDP request
-  switch(process_udp(buf)) {
+  switch(process_udp(&h)) {
     case TYPE_WHOHAS:
       //TODO(Chris): process WHOHAS
+        process_whohas(sock, from, h, config);
         //TODO(David): send IHAVE
       break;
     case TYPE_IHAVE:    

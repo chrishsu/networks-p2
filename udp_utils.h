@@ -3,6 +3,8 @@
 #ifndef _UDP_UTILS
 #define _UDP_UTILS
 
+#include <netinet/in.h>
+
 #define TYPE_WHOHAS 0
 #define TYPE_IHAVE  1
 #define TYPE_GET    2
@@ -12,6 +14,7 @@
 
 typedef struct {
     short type;
+    short pack_len;
     short buf_len;
     int seq_num;
     int ack_num;
@@ -24,13 +27,16 @@ typedef struct chunk_list {
 } chunk_list;
 
 chunk_list *init_chunk_list();
-chunk_list *add_chunk_to_list(chunk_list *list, char *hash);
+chunk_list *add_to_chunk_list(chunk_list *list, char *hash);
 void del_chunk_list(chunk_list *list);
+
+void init_peer_header(peer_header *h);
+void free_peer_header(peer_header *h);
 
 /*
  * @returns The type of request, or -1 if invalid type.
  */
-int process_udp(char *buf);
+int process_udp(peer_header *h);
 
 /*
  * Creates p2p header and UDP header, then sends the packet.
