@@ -15,9 +15,6 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "queue.h"
-#include "udp_utils.h"
-#include "peer_whohas.h"
-#include "peer_ihave.h"
 
 #define TYPE_WHOHAS 0
 #define TYPE_IHAVE  1

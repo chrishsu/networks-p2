@@ -14,10 +14,9 @@
 #include "spiffy.h"
 #include "bt_parse.h"
 #include "input_buffer.h"
-#include "queue.h"
 #include "udp_utils.h"
+#include "queue.h"
 #include "peer_whohas.h"
-#include "peer_ihave.h"
 
 int process_ihave(struct sockaddr_in *from, peer_header *h, void *config);
 

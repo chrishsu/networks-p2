@@ -12,15 +12,15 @@ void printline(char *line, void *cbdata) {
 
 int main() {
 
-  
+
   struct user_iobuf *u;
 
   u = create_userbuf();
   assert(u != NULL);
 
   while (1) {
-    process_user_input(STDIN_FILENO, u, printline, "Cows moo!");
+    ;//process_user_input(STDIN_FILENO, u, printline, "Cows moo!");
   }
-  
+
   return 0;
 }

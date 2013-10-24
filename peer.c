@@ -20,10 +20,10 @@
 #include "spiffy.h"
 #include "bt_parse.h"
 #include "input_buffer.h"
-#include "queue.h"
 #include "udp_utils.h"
 #include "peer_whohas.h"
 #include "peer_ihave.h"
+#include "queue.h"
 
 void peer_run(bt_config_t *config);
 

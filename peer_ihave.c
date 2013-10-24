@@ -1,6 +1,6 @@
 #include "peer_ihave.h"
 
-int process_ihave(struct sockadrr_in *from, peer_header *h, void *config) {
+int process_ihave(struct sockaddr_in *from, peer_header *h, void *config) {
   return 0;
 }
 
@@ -9,7 +9,7 @@ int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_
   int total_chunks = chunk_list_len(chunks);
   int max_chunks = (MAX_PACKET_SIZE - sizeof(packet_head)) / CHUNK_SIZE;
 
-  chunk_list *next = chunk_list;
+  chunk_list *next = chunks;
   while (total_chunks > 0) {
     char num_chunks = total_chunks;
     if (num_chunks > max_chunks)
@@ -34,8 +34,8 @@ int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_
       next = next->next;
       next_loc += 20;
     }
-    ph->buf = buf;
-    int ret_val = send_udp(sock, toaddr, ph, config);
+    ph.buf = buf;
+    int ret_val = send_udp(sock, toaddr, &ph, config);
     if (ret_val < 0)
       return ret_val;
     total_chunks -= num_chunks;
