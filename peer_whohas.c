@@ -5,6 +5,8 @@
  *      guaranteed to have length of 1500 bytes
  */
 int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config_t *config) {
+  DPRINTF(DEBUG_INIT, "Process WHOHAS\n");
+
     #define UDP 8 //UDP header
     #define PAD 4
     chunk_list *chunks, *next;
@@ -26,6 +28,7 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
     }
 
     ret = send_ihave(sock, from, config, chunks);
+    DPRINTF(DEBUG_INIT, "Called send_ihave\n");
 
     //cleanup
     del_chunk_list(chunks);
@@ -78,6 +81,8 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
       send_udp(sock, &(peer->addr), &h, config);
       peer = peer->next;
     }
+    DPRINTF(DEBUG_INIT, "Flooded peers with WHOHAS\n");
+
       /*
     ret = send_udp(sock, &h, config);
       */
