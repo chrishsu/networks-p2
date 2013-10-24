@@ -21,6 +21,9 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "queue.h"
+#include "udp_utils.h"
+#include "peer_whohas.h"
+#include "peer_ihave.h"
 
 void peer_run(bt_config_t *config);
 
@@ -73,7 +76,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   switch(process_udp(&h)) {
     case TYPE_WHOHAS:
       //TODO(Chris): process WHOHAS
-        process_whohas(sock, from, h, config);
+        process_whohas(sock, &from, &h, config);
       break;
     case TYPE_IHAVE:
       //TODO(David): process IHAVE
@@ -94,7 +97,7 @@ void process_get(int sock, char *chunkfile, char *outputfile, bt_config_t *confi
   send_whohas(sock, chunkfile, config);
 }
 
-void handle_user_input(int sock, char *line, void *config) {
+void handle_user_input(int sock, char *line, bt_config_t *config) {
   char chunkf[128], outf[128];
 
   bzero(chunkf, sizeof(chunkf));
@@ -102,7 +105,7 @@ void handle_user_input(int sock, char *line, void *config) {
 
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      process_get(sock, chunkf, outf, (bt_config_t)config);
+      process_get(sock, chunkf, outf, config);
     }
   }
 }
@@ -148,7 +151,7 @@ void peer_run(bt_config_t *config) {
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
 	packet_queue *pq = packet_pop();
-	bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, &(pq->dest_addr), sizeof(pq->dest_addr));
+	size_t bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr *)&(pq->dest_addr), sizeof(pq->dest_addr));
 	if (bytes_sent <= 0) {
 	  fprintf(stderr, "Error sending packet.\n");
 	} else {

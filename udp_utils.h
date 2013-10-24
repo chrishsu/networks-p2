@@ -3,7 +3,21 @@
 #ifndef _UDP_UTILS
 #define _UDP_UTILS
 
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "debug.h"
+#include "spiffy.h"
+#include "bt_parse.h"
+#include "input_buffer.h"
+#include "queue.h"
+#include "udp_utils.h"
+#include "peer_whohas.h"
+#include "peer_ihave.h"
 
 #define TYPE_WHOHAS 0
 #define TYPE_IHAVE  1
@@ -16,7 +30,7 @@
 #define MAX_PACKET_SIZE 1500
 #define CHUNK_SIZE 20
 
-typedef struct {
+typedef struct peer_header {
     short type;
     short pack_len;
     short buf_len;
@@ -25,7 +39,7 @@ typedef struct {
     char *buf;
 } peer_header;
 
-typedef struct {
+typedef struct packet_head {
   short magic_num;
   char version;
   char type;

@@ -3,7 +3,21 @@
 #ifndef _IHAVE
 #define _IHAVE
 
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "debug.h"
+#include "spiffy.h"
+#include "bt_parse.h"
+#include "input_buffer.h"
+#include "queue.h"
 #include "udp_utils.h"
+#include "peer_whohas.h"
+#include "peer_ihave.h"
 
 int process_ihave(struct sockaddr_in *from, peer_header *h, void *config);
 

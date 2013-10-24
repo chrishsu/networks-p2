@@ -19,9 +19,9 @@ struct user_iobuf *create_userbuf() {
   return b;
 }
 
-void process_user_input(int fd, struct user_iobuf *userbuf, 
-			void (*handle_line)(int, char *, void *), int sock, void *cbdata)
-{
+void process_user_input(int fd, struct user_iobuf *userbuf,
+			void (*handle_line)(int, char *, bt_config_t *),
+			int sock, bt_config_t *cbdata) {
   int nread;
   char *ret;
 
@@ -37,7 +37,7 @@ void process_user_input(int fd, struct user_iobuf *userbuf,
     //TODO: don't just exit
   }
 
-  nread = read(fd, userbuf->buf + userbuf->cur, 
+  nread = read(fd, userbuf->buf + userbuf->cur,
 	       (USERBUF_SIZE - userbuf->cur));
 
   if (nread > 0) {

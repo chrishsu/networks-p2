@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+#ifndef _QUEUE
+#define _QUEUE
+
 typedef struct packet_queue {
   char *buf;
   size_t len;
@@ -16,3 +19,5 @@ void packet_new(char *b, size_t l, struct sockaddr *a);
 void packet_push(packet_queue *p);
 packet_queue *packet_pop();
 void packet_free(packet_queue *p);
+
+#endif

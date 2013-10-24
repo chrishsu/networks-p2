@@ -1,4 +1,4 @@
-#include "upd_utils.h"
+#include "udp_utils.h"
 
 chunk_list *init_chunk_list() {
   return NULL;
@@ -74,11 +74,10 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
     // Failed allocating packet string
     return -1;
   }
-  memcpy(packet, ph, sizeof(ph));
+  memcpy(packet, &ph, sizeof(ph));
   strncpy(packet + sizeof(ph), h->buf, h->buf_len);
 
-  packet_queue *pq = packet_new(packet, h->pack_len, (struct sockaddr *)toaddr);
-  packet_push(pq);
+  packet_new(packet, h->pack_len, (struct sockaddr *)toaddr);
 
   return 0;
 }
