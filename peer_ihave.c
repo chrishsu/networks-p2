@@ -40,7 +40,7 @@ int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_
       return ret_val;
     total_chunks -= num_chunks;
 
-    DPRINTF(DEBUG_INIT, "Added IHAVE to queue with %d chunks\n", num_chunks);
+    printf("Added IHAVE to queue with %d chunks\n", num_chunks);
   }
   return 0;
 }

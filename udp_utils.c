@@ -60,6 +60,7 @@ int process_udp(peer_header *h) {
 }
 
 int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *config) {
+  printf("send udp...\n");
   packet_head ph;
   ph.magic_num = htons(15441);
   ph.version = 1; // No byte conversion required
@@ -68,6 +69,8 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
   ph.packet_len = htons(h->pack_len);
   ph.seq_num = htonl(h->seq_num);
   ph.ack_num = htonl(h->ack_num);
+
+  printf("Packet len = %d\n", (int)(h->pack_len));
 
   char *packet = malloc(h->pack_len);
   if (!packet) {
@@ -78,6 +81,8 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
   strncpy(packet + sizeof(ph), h->buf, h->buf_len);
 
   packet_new(packet, h->pack_len, (struct sockaddr *)toaddr);
+  if (packet_empty())
+    printf("Empty!!\n");
 
   return 0;
 }

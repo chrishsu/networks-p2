@@ -5,7 +5,7 @@
  *      guaranteed to have length of 1500 bytes
  */
 int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config_t *config) {
-  DPRINTF(DEBUG_INIT, "Process WHOHAS\n");
+  printf("Process WHOHAS\n");
 
     #define UDP 8 //UDP header
     #define PAD 4
@@ -28,7 +28,7 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
     }
 
     ret = send_ihave(sock, from, config, chunks);
-    DPRINTF(DEBUG_INIT, "Called send_ihave\n");
+    printf("Called send_ihave\n");
 
     //cleanup
     del_chunk_list(chunks);
@@ -37,6 +37,7 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
 }
 
 int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
+  printf("Send whohas...\n");
     FILE *file;
     peer_header h;
     int lines = 0;
@@ -45,12 +46,14 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
 
     file = fopen(chunkfile, "r");
     if (file == NULL) {
+      printf("No chunkfile!\n");
         return -1;
     }
     //get lines
-    while ((nl = fgetc(file)) != '\0') {
+    while ((nl = fgetc(file)) != EOF) {
         if (nl == '\n') lines++;
     }
+    printf("end loop\n");
     fseek(file, 0L, SEEK_SET);
 
     //allocate space
@@ -73,7 +76,7 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
     //header setup
     h.type = TYPE_WHOHAS;
     h.buf_len = 4 + (lines * 20);
-
+    h.pack_len = h.buf_len + 16;
 
 
     bt_peer_t *peer = config->peers;
@@ -81,7 +84,7 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
       send_udp(sock, &(peer->addr), &h, config);
       peer = peer->next;
     }
-    DPRINTF(DEBUG_INIT, "Flooded peers with WHOHAS\n");
+    printf("Flooded peers with WHOHAS\n");
 
       /*
     ret = send_udp(sock, &h, config);
