@@ -1,11 +1,11 @@
 #include "peer_ihave.h"
 
 int process_ihave(struct sockadrr_in *from, peer_header *h, void *config) {
-
+  return 0;
 }
 
 // Does nothing if chunks is empty:
-int send_ihave(int sock, int peer_id, void *config, chunk_list *chunks) {
+int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_list *chunks) {
   int total_chunks = chunk_list_len(chunks);
   int max_chunks = (MAX_PACKET_SIZE - sizeof(packet_head)) / CHUNK_SIZE;
 
@@ -35,7 +35,7 @@ int send_ihave(int sock, int peer_id, void *config, chunk_list *chunks) {
       next_loc += 20;
     }
     ph->buf = buf;
-    int ret_val = send_udp(sock, peer_id, ph, config);
+    int ret_val = send_udp(sock, toaddr, ph, config);
     if (ret_val < 0)
       return ret_val;
     total_chunks -= num_chunks;

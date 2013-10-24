@@ -5,8 +5,8 @@
 
 #include "udp_utils.h"
 
-int process_ihave(struct sockadrr_in *from, peer_header *h, void *config);
+int process_ihave(struct sockaddr_in *from, peer_header *h, void *config);
 
-int send_ihave(int sock, struct sockaddr_in *to, void *config, chunk_list *chunks);
+int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_list *chunks);
 
 #endif

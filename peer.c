@@ -73,10 +73,11 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     case TYPE_WHOHAS:
       //TODO(Chris): process WHOHAS
         process_whohas(sock, from, h, config);
-        //TODO(David): send IHAVE
       break;
     case TYPE_IHAVE:
       //TODO(David): process IHAVE
+      break;
+    case DROPPED:
       break;
     default:
       // Not yet implemented
@@ -109,7 +110,7 @@ void handle_user_input(int sock, char *line, void *config) {
 void peer_run(bt_config_t *config) {
   int sock;
   struct sockaddr_in myaddr;
-  fd_set readfds;
+  fd_set readfds, writefds;
   struct user_iobuf *userbuf;
 
   if ((userbuf = create_userbuf()) == NULL) {
@@ -138,10 +139,29 @@ void peer_run(bt_config_t *config) {
     int nfds;
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
+    if (!packet_empty())
+      FD_SET(sock, &writefds);
 
     nfds = select(sock+1, &readfds, NULL, NULL, NULL);
 
     if (nfds > 0) {
+      if (FD_ISSET(sock, &writefds)) {
+	packet_queue *pq = packet_pop();
+	bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, &(pq->dest_addr), sizeof(pq->dest_addr));
+	if (bytes_sent <= 0) {
+	  fprintf(stderr, "Error sending packet.\n");
+	} else {
+	  size_t newLen = pq->len - bytes_sent;
+	  if (newLen > 0) {
+	    memcpy(pq->buf, pq->buf + bytes_sent, newLen);
+	    pq->len = newLen;
+	    packet_push(pq);
+	  } else {
+	    packet_free(pq);
+	  }
+	}
+      }
+
       if (FD_ISSET(sock, &readfds)) {
         process_inbound_udp(sock, config);
       }

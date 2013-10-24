@@ -10,13 +10,13 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, void *con
     chunk_list *chunks, *next;
     short num_chunks, OFFSET;
     int i, ret;
-    
+
     chunks = init_chunk_list();
     next = chunks;
     //get the number of chunks
     num_chunks = ntohs(h->buf[UDP + h->pack_len]); //correct usage of ntohs?
     OFFSET = UPD + h->pack_len + PAD;
-    
+
     //loop through
     for (i = 0; i < num_chunks; i++) {
         char hash[20];
@@ -24,22 +24,22 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, void *con
         next = add_to_chunk_list(next, hash);
         if (i == 0) chunks = next;
     }
-    
+
     ret = send_ihave(sock, from, config, chunks);
-    
+
     //cleanup
     del_chunk_list(chunks);
-    
+
     return ret;
 }
 
-int send_whohas(int sock, char *chunkfile, void *config) {
+int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
     FILE *file;
     peer_header h;
     int lines = 0;
     char nl;
     int i, ret;
-    
+
     file = fopen(chunkfile, "r");
     if (file == NULL) {
         return -1;
@@ -49,12 +49,12 @@ int send_whohas(int sock, char *chunkfile, void *config) {
         if (nl == '\n') lines++;
     }
     fseek(file, 0L, SEEK_SET);
-    
+
     //allocate space
     init_peer_header(&h);
     h.buf = malloc(4 + (lines * 20));
     h.buf[0] = lines & 0xFF; // Number of chunk hashes
-    
+
     //get hashes
     for (i = 0; i < lines; i++) {
         short place, idx;
@@ -66,15 +66,24 @@ int send_whohas(int sock, char *chunkfile, void *config) {
             if (nl == ' ') place = 1;
         }
     }
-    
-    //header setup 
+
+    //header setup
     h.type = TYPE_WHOHAS;
     h.buf_len = 4 + (lines * 20);
-    
+
+
+
+    bt_peer_t *peer = config->peers;
+    while (peer != NULL) {
+      send_udp(sock, addr, &h, config);
+      peer = peer->next;
+    }
+      /*
     ret = send_udp(sock, &h, config);
-    
+      */
+
     //cleanup
     free_peer_header(&h);
-    
+
     return ret;
 }

@@ -11,6 +11,7 @@
 #define TYPE_DATA   3
 #define TYPE_ACK    4
 #define TYPE_DENIED 5
+#define DROPPED -1
 
 #define MAX_PACKET_SIZE 1500
 #define CHUNK_SIZE 20
@@ -55,6 +56,6 @@ int process_udp(peer_header *h);
 /*
  * Creates p2p header and UDP header, then sends the packet.
  */
-int send_udp(int sock, int peer_id, peer_header *h, void *config);
+int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *config);
 
 #endif
