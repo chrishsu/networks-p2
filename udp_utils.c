@@ -17,6 +17,12 @@ chunk_list *add_to_chunk_list(chunk_list *list, char *hash) {
   return new_list;
 }
 
+int chunk_list_len(chunk_list *list) {
+  if (list == NULL)
+    return 0;
+  return 1 + chunk_list_len(list->next);
+}
+
 void del_chunk_list(chunk_list *list) {
   if (list == NULL) return;
   del_chunk_list(list->next);
@@ -39,9 +45,43 @@ void free_peer_header(peer_header *h) {
 
 
 int process_udp(peer_header *h) {
-  return -1;
+  short magic_num = *(short *)(h->buf);
+  char version = *(char *)(h->buf + 2);
+  if (magic_num != 15441 ||
+      version != 1)
+    return -1; // Drop the packet
+
+  h->type = *(char *)(h->buf + 3);
+  h->buf_len = *(short *)(h->buf + 4);
+  h->pack_len = *(short *)(h->buf + 6);
+  h->seq_num = *(int *)(h->buf + 8);
+  h->ack_num = *(int *)(h->buf + 12);
+  return h->type;
 }
 
-int send_udp(int sock, peer_header *h, void *config) {
-  returns -1;
+int send_udp(int sock, int peer_id, peer_header *h, bt_config_t *config) {
+  bt_peer_t *info = bt_peer_info(config, peer_id);
+  struct sockaddr_in toaddr = info->addr;
+
+  packet_head ph;
+  ph.magic_num = htons(15441);
+  ph.version = 1; // No byte conversion required
+  ph.type = htons(h->type);
+  ph.header_len = htons(h->buf_len);
+  ph.packet_len = htons(h->pack_len);
+  ph.seq_num = htonl(h->seq_num);
+  ph.ack_num = htonl(h->ack_num);
+
+  char *packet = malloc(h->pack_len);
+  if (!packet) {
+    // Failed allocating packet string
+    return -2; // -1 reserved for spiffy_sendto error
+  }
+  memcpy(packet, ph, sizeof(ph));
+  strncpy(packet + sizeof(ph), h->buf, h->pack_len - sizeof(ph));
+
+  int ret_val spiffy_sendto(sock, &packet, h->pack_len, 0,
+			    (struct sockaddr *)&(info->addr), sizeof(info->addr));
+  free(packet);
+  return ret_val;
 }
