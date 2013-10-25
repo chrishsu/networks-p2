@@ -2,6 +2,7 @@
 
 packet_queue *head;
 packet_queue *tail;
+int PQindex;
 
 /**
  * Initializes the packet_queue.
@@ -9,6 +10,7 @@ packet_queue *tail;
 void packet_init() {
   head = NULL;
   tail = NULL;
+  PQindex = 0;
 }
 
 /**
@@ -33,11 +35,21 @@ int packet_empty() {
  */
 void packet_new(char *b, size_t l, struct sockaddr *a) {
   packet_queue *n = malloc(sizeof(packet_queue));
+  PQindex++;
+  n->idx = PQindex;
   n->buf = b;
   n->len = l;
   n->dest_addr = a;
   n->next = NULL;
   packet_push(n);
+}
+
+void packet_inspect() {
+  int lh, lt;
+  lh = 0; lt = 0;
+  if (head != NULL) lh = (int)head->idx;
+  if (tail != NULL) lt = (int)tail->idx;
+  printf("head: %d\ttail:%d\n", lh, lt);
 }
 
 /**
@@ -47,6 +59,7 @@ void packet_new(char *b, size_t l, struct sockaddr *a) {
  *    The packet.
  */
 void packet_push(packet_queue *p) {
+  if (p == NULL) return;
   if (packet_empty()) {
     head = p;
     tail = p;
@@ -55,6 +68,8 @@ void packet_push(packet_queue *p) {
     tail->next = p;
     tail = p;
   }
+  printf("index: %d\n", p->idx);
+  packet_inspect();
 }
 
 /**
@@ -71,6 +86,7 @@ packet_queue *packet_pop() {
   }
   head = head->next;
   tmp->next = NULL;
+  packet_inspect();
   return tmp;
 }
 
@@ -83,7 +99,7 @@ packet_queue *packet_pop() {
 void packet_free(packet_queue *p) {
   if (p == NULL) return;
   if (p->buf != NULL) free(p->buf);
+  packet_inspect();
   //if (p->dest_addr != NULL) free(p->dest_addr);
   free(p);
-  p = NULL;
 }

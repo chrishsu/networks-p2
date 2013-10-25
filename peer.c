@@ -151,23 +151,27 @@ void peer_run(bt_config_t *config) {
 
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
-	packet_queue *pq = packet_pop();
-	printf("Trying to send %d bytes...\n", (int)(pq->len));
-	size_t bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr *)pq->dest_addr, sizeof(*(pq->dest_addr)));
-	printf("Sent %d bytes\n", (int)bytes_sent);
-	if (bytes_sent < 0) {
-	  fprintf(stderr, "Error sending packet\n");
-	} else {
-	  size_t newLen = pq->len - bytes_sent;
-	  if (newLen > 0) {
-	    memcpy(pq->buf, pq->buf + bytes_sent, newLen);
-	    pq->len = newLen;
-	    packet_push(pq);
-	  } else {
-	    printf("Calling packet_free\n");
-	    packet_free(pq);
-	  }
-	}
+        packet_queue *pq = packet_pop();
+        if (pq == NULL) {
+          FD_CLR(sock, &writefds);
+          continue;
+        }
+        printf("Trying to send %d bytes...\n", (int)(pq->len));
+        size_t bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr *)pq->dest_addr, sizeof(*(pq->dest_addr)));
+        printf("Sent %d bytes\n", (int)bytes_sent);
+        if (bytes_sent < 0) {
+          fprintf(stderr, "Error sending packet\n");
+        } else {
+          size_t newLen = pq->len - bytes_sent;
+          if (newLen > 0) {
+            memcpy(pq->buf, pq->buf + bytes_sent, newLen);
+            pq->len = newLen;
+            packet_push(pq);
+          } else {
+            packet_free(pq);
+          }
+        }
+        FD_CLR(sock, &writefds);
       }
 
       if (FD_ISSET(sock, &readfds)) {

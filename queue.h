@@ -3,9 +3,12 @@
 #ifndef _QUEUE
 #define _QUEUE
 
+#include <stdio.h>
+
 typedef struct packet_queue {
   char *buf;
   size_t len;
+  int idx;
   struct sockaddr *dest_addr;
   struct packet_queue *next;
 } packet_queue;
