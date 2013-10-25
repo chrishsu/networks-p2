@@ -8,10 +8,13 @@ chunk_list *add_to_chunk_list(chunk_list *list, char *hash) {
   chunk_list *new_list;
   new_list = malloc(sizeof(chunk_list));
   memcpy(new_list->hash, hash, 20);
+  new_list->next = NULL;
   if (list == NULL) {
+    //printf("list == NULL\n");
     list = new_list;
   }
   else { //list->next == NULL
+    //printf("list != NULL\n");
     list->next = new_list;
   }
   return new_list;
@@ -45,22 +48,25 @@ void free_peer_header(peer_header *h) {
 
 
 int process_udp(peer_header *h) {
-  short magic_num = *(short *)(h->buf);
+  printf("Processing header..\n");
+  short magic_num = ntohs(*(short *)(h->buf));
   char version = *(char *)(h->buf + 2);
   if (magic_num != 15441 ||
-      version != 1)
+      version != 1) {
+    //printf("magic_num: %d\tversion: %d\n", magic_num, version);
     return DROPPED; // Drop the packet
-
+  }
   h->type = *(char *)(h->buf + 3);
-  h->buf_len = ntohs(*(short *)(h->buf + 4));
+  h->head_len = ntohs(*(short *)(h->buf + 4));
   h->pack_len = ntohs(*(short *)(h->buf + 6));
+  h->buf_len = h->pack_len - h->head_len;
   h->seq_num = ntohl(*(int *)(h->buf + 8));
   h->ack_num = ntohl(*(int *)(h->buf + 12));
   return h->type;
 }
 
 int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *config) {
-  printf("send udp...\n");
+  printf("Sending udp...\n");
   packet_head ph;
   ph.magic_num = htons(15441);
   ph.version = 1; // No byte conversion required
@@ -70,7 +76,7 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
   ph.seq_num = htonl(h->seq_num);
   ph.ack_num = htonl(h->ack_num);
 
-  printf("Packet len = %d\n", (int)(h->pack_len));
+  //printf("Packet len = %d\n", (int)(h->pack_len));
 
   char *packet = malloc(h->pack_len);
   if (!packet) {
