@@ -164,8 +164,8 @@ void peer_run(bt_config_t *config) {
 	    pq->len = newLen;
 	    packet_push(pq);
 	  } else {
-	    printf("Calling packet_free\n");
-	    packet_free(pq);
+	    //printf("Calling packet_free\n");
+	    //packet_free(pq);
 	  }
 	}
       }
