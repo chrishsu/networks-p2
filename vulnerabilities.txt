@@ -1,0 +1,5 @@
+VULNERABILITIES
+
+For Checkpoint 1:
+- Running out of memory could have significant negative impact on the program,
+especially when malloc is unchecked.
