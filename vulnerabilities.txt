@@ -3,3 +3,4 @@ VULNERABILITIES
 For Checkpoint 1:
 - Running out of memory could have significant negative impact on the program,
 especially when malloc is unchecked.
+- Possible for the UDP port to attempt to process messages from itself.
