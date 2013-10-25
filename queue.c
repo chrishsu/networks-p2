@@ -68,8 +68,8 @@ void packet_push(packet_queue *p) {
     tail->next = p;
     tail = p;
   }
-  printf("index: %d\n", p->idx);
-  packet_inspect();
+  //printf("index: %d\n", p->idx);
+  //packet_inspect();
 }
 
 /**
@@ -86,7 +86,7 @@ packet_queue *packet_pop() {
   }
   head = head->next;
   tmp->next = NULL;
-  packet_inspect();
+  //packet_inspect();
   return tmp;
 }
 
@@ -99,7 +99,7 @@ packet_queue *packet_pop() {
 void packet_free(packet_queue *p) {
   if (p == NULL) return;
   if (p->buf != NULL) free(p->buf);
-  packet_inspect();
+  //packet_inspect();
   //if (p->dest_addr != NULL) free(p->dest_addr);
   free(p);
 }

@@ -29,8 +29,9 @@
 
 typedef struct peer_header {
     short type;
-    short pack_len;
+    short head_len;
     short buf_len;
+    short pack_len;
     int seq_num;
     int ack_num;
     char *buf;

@@ -66,32 +66,31 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   init_peer_header(&h); //no need to free
   h.buf = buf;
 
-  printf("PROCESS_INBOUND_UDP SKELETON -- replace!\n"
-	 "Incoming message from %s:%d\n%s\n\n",
-	 inet_ntoa(from.sin_addr),
-	 ntohs(from.sin_port),
-	 h.buf);
+  printf("Incoming message from %s:%d\n",
+    inet_ntoa(from.sin_addr),
+    ntohs(from.sin_port));
 
   //TODO(David): process UDP request
   switch(process_udp(&h)) {
     case TYPE_WHOHAS:
       //TODO(Chris): process WHOHAS
-        process_whohas(sock, &from, &h, config);
+      process_whohas(sock, &from, &h, config);
       break;
     case TYPE_IHAVE:
       //TODO(David): process IHAVE
+      process_ihave(&from, &h, config);
       break;
     case DROPPED:
       break;
     default:
+      printf("TYPE: %d\n", h.type);
       // Not yet implemented
       break;
   }
 }
 
 void process_get(int sock, char *chunkfile, char *outputfile, bt_config_t *config) {
-  printf("PROCESS GET SKELETON CODE CALLED.  Fill me in!  (%s, %s)\n",
-	chunkfile, outputfile);
+  printf("Process GET (%s, %s)\n", chunkfile, outputfile); 
 
   //TODO(Chris): send WHOHAS
   send_whohas(sock, chunkfile, config);
@@ -105,7 +104,11 @@ void handle_user_input(int sock, char *line, bt_config_t *config) {
 
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
+      printf("\n");
       process_get(sock, chunkf, outf, config);
+    }
+    else {
+      printf("Usage: GET [chunk-file] [out-file]\n\n");
     }
   }
 }
@@ -156,9 +159,9 @@ void peer_run(bt_config_t *config) {
           FD_CLR(sock, &writefds);
           continue;
         }
-        printf("Trying to send %d bytes...\n", (int)(pq->len));
+        printf("Trying to send %d bytes...\t", (int)(pq->len));
         size_t bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr *)pq->dest_addr, sizeof(*(pq->dest_addr)));
-        printf("Sent %d bytes\n", (int)bytes_sent);
+        printf("sent %d bytes\n", (int)bytes_sent);
         if (bytes_sent < 0) {
           fprintf(stderr, "Error sending packet\n");
         } else {
