@@ -5,6 +5,7 @@
 
 #include "udp_utils.h"
 #include "peer_ihave.h"
+#include "chunk.h"
 
 /*
  * Calls send_ihave()

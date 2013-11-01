@@ -34,6 +34,18 @@ int packet_empty() {
  *    The sockaddr struct.
  */
 void packet_new(char *b, size_t l, struct sockaddr *a) {
+  printf("packet_new!\n");
+  printf("b: ");
+  int i;
+  for (i = 0; i < l; i++) {
+    uint8_t c = b[i];
+    char *hex = (char *)malloc(2);
+    binary2hex(&c, 1, hex);
+    printf("%s ", hex);
+    free(hex);
+  }
+  printf("\n\n");
+
   packet_queue *n = malloc(sizeof(packet_queue));
   PQindex++;
   n->idx = PQindex;

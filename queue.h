@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "chunk.h"
 
 #ifndef _QUEUE
 #define _QUEUE
