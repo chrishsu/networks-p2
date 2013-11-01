@@ -1,5 +1,59 @@
 #include "peer_whohas.h"
 
+int hash_equal(char *h1, char *h2) {
+  printf("hash_equal: ");
+  int k;
+  for (k = 0; k < 20; k++) {
+    uint8_t c = h1[k];
+    char *hex = (char *)malloc(2);
+    binary2hex(&c, 1, hex);
+    printf("%s", hex);
+    free(hex);
+  }
+  printf(" and ");
+  for (k = 0; k < 20; k++) {
+    uint8_t c = h2[k];
+    char *hex = (char *)malloc(2);
+    binary2hex(&c, 1, hex);
+    printf("%s", hex);
+    free(hex);
+  }
+  printf(".\n");
+
+  int i;
+  for (i = 0; i < 20; i++) {
+    if (h1[i] != h2[i])
+      return 0;
+  }
+  return 1;
+}
+
+int has_chunk(char *hash, bt_config_t *config) {
+  printf("has_chunk_file: '%s'\n", config->has_chunk_file);
+  FILE *has_chunk_file = fopen(config->has_chunk_file, "r");
+  if (has_chunk_file == NULL) {
+    fprintf(stderr, "Error opening has-chunk-file\n");
+    return 0;
+  }
+
+  int id;
+  char buf[41];
+  while (1) {
+    if (fscanf(has_chunk_file, "%d %s", &id, buf) == EOF)
+      break;
+
+    uint8_t binary[20];
+    hex2binary(buf, 40, binary);
+
+    printf("chunk from file: %s\n", buf);
+
+    if (hash_equal(hash, (char *)binary))
+      return 1;
+  }
+  printf("Done with has_chunk\n");
+  return 0;
+}
+
 /*
  * @param[in]   buf
  *      guaranteed to have length of 1500 bytes
@@ -39,6 +93,7 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
       char hash[20];
       memcpy(hash, &(h->buf[OFFSET + 20*i]), 20);
 
+      printf("looking at hash: \n");
       int k;
       for (k = 0; k < 20; k++) {
 	uint8_t c = (hash)[k];
@@ -47,14 +102,23 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
 	printf("%s ", hex);
 	free(hex);
       }
+      if (has_chunk(hash, config)) {
+	printf("Adding...\n");
+	next = add_to_chunk_list(next, hash);
+	if (i == 0)
+	  chunks = next;
+      } else
+	printf("Skipping...\n");
 
+      /*
       char testHash[21];
       memcpy(testHash, hash, 20);
       testHash[20] = 0;
       printf("Copied hash: '%s'\n", testHash);
+      */
 
-      next = add_to_chunk_list(next, hash);
-      if (i == 0) chunks = next;
+      //next = add_to_chunk_list(next, hash);
+      //if (i == 0) chunks = next;
       //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
     }
     //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
