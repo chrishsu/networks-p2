@@ -1,25 +1,6 @@
 #include "peer_whohas.h"
 
 int hash_equal(char *h1, char *h2) {
-  printf("hash_equal: ");
-  int k;
-  for (k = 0; k < 20; k++) {
-    uint8_t c = h1[k];
-    char *hex = (char *)malloc(2);
-    binary2hex(&c, 1, hex);
-    printf("%s", hex);
-    free(hex);
-  }
-  printf(" and ");
-  for (k = 0; k < 20; k++) {
-    uint8_t c = h2[k];
-    char *hex = (char *)malloc(2);
-    binary2hex(&c, 1, hex);
-    printf("%s", hex);
-    free(hex);
-  }
-  printf(".\n");
-
   int i;
   for (i = 0; i < 20; i++) {
     if (h1[i] != h2[i])
@@ -29,7 +10,6 @@ int hash_equal(char *h1, char *h2) {
 }
 
 int has_chunk(char *hash, bt_config_t *config) {
-  printf("has_chunk_file: '%s'\n", config->has_chunk_file);
   FILE *has_chunk_file = fopen(config->has_chunk_file, "r");
   if (has_chunk_file == NULL) {
     fprintf(stderr, "Error opening has-chunk-file\n");
@@ -45,12 +25,9 @@ int has_chunk(char *hash, bt_config_t *config) {
     uint8_t binary[20];
     hex2binary(buf, 40, binary);
 
-    printf("chunk from file: %s\n", buf);
-
     if (hash_equal(hash, (char *)binary))
       return 1;
   }
-  printf("Done with has_chunk\n");
   return 0;
 }
 
@@ -59,83 +36,65 @@ int has_chunk(char *hash, bt_config_t *config) {
  *      guaranteed to have length of 1500 bytes
  */
 int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config_t *config) {
-  printf("Process WHOHAS\n");
-  printf("h->buf: \n");
-  int k;
-  for (k = 0; k < h->buf_len; k++) {
-    uint8_t c = (h->buf)[k];
-    char *hex = (char *)malloc(2);
-    binary2hex(&c, 1, hex);
-    printf("%s ", hex);
-    free(hex);
+  #define PAD 4
+  chunk_list *chunks, *next;
+  short OFFSET;
+  char num_chunks;
+  int i, ret;
+
+  chunks = init_chunk_list();
+  next = NULL;
+  //get the number of chunks
+  if (h->head_len < 16) {
+    printf("header is less than 16!\n");
+    return -1; //something is wrong
   }
-  printf("\n\n");
+  num_chunks = h->buf[h->head_len]; //correct usage of ntohs?
+  OFFSET = sizeof(packet_head) + PAD;
+  //printf("head_len: %d\tchunks: %X\n", h->head_len, num_chunks);
 
-    #define PAD 4
-    chunk_list *chunks, *next;
-    short OFFSET;
-    char num_chunks;
-    int i, ret;
+  //loop through
+  for (i = 0; i < (int)num_chunks; i++) {
+    char hash[20];
+    memcpy(hash, &(h->buf[OFFSET + 20*i]), 20);
 
-    chunks = init_chunk_list();
-    next = NULL;
-    //get the number of chunks
-    if (h->head_len < 16) {
-      printf("header is less than 16!\n");
-      return -1; //something is wrong
+    //printf("looking at hash: \n");
+
+    int k;
+    for (k = 0; k < 20; k++) {
+      //uint8_t c = hash[k];
+      char *hex = (char *)malloc(2);
+      //binary2hex(&c, 1, hex);
+      //printf("%s ", hex);
+      free(hex);
     }
-    num_chunks = h->buf[h->head_len]; //correct usage of ntohs?
-    OFFSET = sizeof(packet_head) + PAD;
-    //printf("head_len: %d\tchunks: %X\n", h->head_len, num_chunks);
-
-    //loop through
-    for (i = 0; i < (int)num_chunks; i++) {
-      char hash[20];
-      memcpy(hash, &(h->buf[OFFSET + 20*i]), 20);
-
-      printf("looking at hash: \n");
-      int k;
-      for (k = 0; k < 20; k++) {
-	uint8_t c = (hash)[k];
-	char *hex = (char *)malloc(2);
-	binary2hex(&c, 1, hex);
-	printf("%s ", hex);
-	free(hex);
-      }
-      if (has_chunk(hash, config)) {
-	printf("Adding...\n");
-	next = add_to_chunk_list(next, hash);
-	if (i == 0)
-	  chunks = next;
-      } else
-	printf("Skipping...\n");
-
-      /*
-      char testHash[21];
-      memcpy(testHash, hash, 20);
-      testHash[20] = 0;
-      printf("Copied hash: '%s'\n", testHash);
-      */
+    if (has_chunk(hash, config)) {
+      printf("Adding...\n");
+      next = add_to_chunk_list(next, hash);
+      if (i == 0)
+	chunks = next;
+    } else
+      printf("Skipping...\n");
 
       //next = add_to_chunk_list(next, hash);
       //if (i == 0) chunks = next;
       //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
-    }
-    //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
+  }
+  //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
 
-    struct sockaddr_in toaddr;
-    bzero(&toaddr, sizeof(toaddr));
-    toaddr.sin_family = AF_INET;
-    toaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    toaddr.sin_port = from->sin_port;
+  struct sockaddr_in toaddr;
+  bzero(&toaddr, sizeof(toaddr));
+  toaddr.sin_family = AF_INET;
+  toaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  toaddr.sin_port = from->sin_port;
 
-    ret = send_ihave(sock, &toaddr, config, chunks);
-    printf("Called send_ihave\n");
+  ret = send_ihave(sock, &toaddr, config, chunks);
+  printf("Called send_ihave\n");
 
-    //cleanup
-    del_chunk_list(chunks);
+  //cleanup
+  del_chunk_list(chunks);
 
-    return ret;
+  return ret;
 }
 
 // Assumes c is in a-z or 0-9
@@ -179,10 +138,6 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
     h.buf[3] = 0;
 
     for (i = 0; i < lines; i++) {
-      /*      char *line = malloc(40);
-      size_t numBytes = 40;
-      getline(&line, &numBytes, file);
-      printf("Got '%s'\n", line);*/
       int id;
       char hash_part[41];
       fscanf(file, "%d %s", &id, hash_part);
@@ -191,31 +146,6 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
       hex2binary(hash_part, 40, binary);
       memcpy(&h.buf[4 + i * 20], binary, 20);
     }
-
-    printf("h: ");
-    for (i = 0; i < 4 + lines * 20; i++) {
-      uint8_t c = h.buf[i];
-      char *hex = (char *)malloc(2);
-      binary2hex(&c, 1, hex);
-      printf("%s ", hex);
-      free(hex);
-    }
-    printf("\n\n");
-
-    /*
-    //get hashes
-    for (i = 0; i < lines; i++) {
-        short place, idx;
-        place = 0; idx = 0;
-        while ((nl = fgetc(file)) != '\n') {
-            if (place) {
-                h.buf[4+((i+1)*idx)] = nl;
-            }
-            if (nl == ' ') place = 1;
-        }
-	}*/
-
-    //printf("BUFFER: %X\n\n", h.buf[0]);
 
     //header setup
     h.type = TYPE_WHOHAS;
@@ -230,10 +160,6 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
       peer = peer->next;
     }
     printf("Flooded peers with WHOHAS\n");
-
-      /*
-    ret = send_udp(sock, &h, config);
-      */
 
     //cleanup
     free_peer_header(&h);

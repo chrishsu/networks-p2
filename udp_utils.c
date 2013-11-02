@@ -86,32 +86,9 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
   memcpy(packet, &ph, sizeof(ph));
   memcpy(packet + sizeof(ph), h->buf, h->buf_len);
 
-  printf("h->buf: \n");
-  int i;
-  for (i = 0; i < h->buf_len; i++) {
-    uint8_t c = (h->buf)[i];
-    char *hex = (char *)malloc(2);
-    binary2hex(&c, 1, hex);
-    printf("%s ", hex);
-    free(hex);
-  }
-  printf("\n\n");
-
-  printf("packet to send: \n");
-  for (i = 0; i < h->buf_len; i++) {
-    uint8_t c = (packet + sizeof(ph))[i];
-    char *hex = (char *)malloc(2);
-    binary2hex(&c, 1, hex);
-    printf("%s ", hex);
-    free(hex);
-  }
-  printf("\n\n");
-
-  printf("Calling packet new...\n");
-  packet_new(packet, h->pack_len, (struct sockaddr *)toaddr);
-  if (packet_empty())
-    printf("Empty!!\n");
-  printf("Done!\n");
+  struct sockaddr_in *newaddr = malloc(sizeof(struct sockaddr_in));
+  *newaddr = *toaddr;
+  packet_new(packet, h->pack_len, (struct sockaddr *)newaddr);
 
   return 0;
 }
