@@ -11,8 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "debug.h"
-#include "spiffy.h"
-#include "input_buffer.h"
 #include "chunk.h"
 
 #define TYPE_WHOHAS 0

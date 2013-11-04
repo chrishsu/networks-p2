@@ -34,6 +34,7 @@ void bt_init(bt_config_t *config, int argc, char **argv) {
   config->cur_download = 0;
   config->cur_upload = 0;
   config->download = NULL;
+  config->download_tail = NULL;
   config->upload = NULL;
 }
 
@@ -150,6 +151,7 @@ void bt_parse_peer_list(bt_config_t *config) {
 
     node->id = nodeid;
     node->downloading = 0;
+    node->chunk = NULL;
 
     host = gethostbyname(hostname);
     assert(host != NULL);
@@ -176,4 +178,187 @@ void bt_dump_config(bt_config_t *config) {
 
   for (p = config->peers; p; p = p->next)
     printf("  peer %d: %s:%d\n", p->id, inet_ntoa(p->addr.sin_addr), ntohs(p->addr.sin_port));
+}
+
+/**
+ * Adds a peer to the chunk.
+ */
+void add_peer_list(bt_chunk_list *chunk, bt_peer_t *peer) {
+  if (chunk == NULL) return;
+  bt_peer_list *pl = malloc(sizeof(bt_peer_list));
+  pl->peer = peer;
+  pl->next = chunk->peers;
+  chunk->peers = pl;
+}
+
+/**
+ * Deletes a peer list from a chunk.
+ */
+void del_peer_list(bt_chunk_list *chunk) {
+  if (chunk == NULL) return;
+  bt_peer_list *pl = chunk->peers;
+  while (pl != NULL) {
+    bt_peer_list *tmp = pl->next;
+    free(pl);
+    pl = tmp;
+  }
+}
+
+/**
+ * Adds a packet to the chunk.
+ * If received out of order, initializes empty list nodes.
+ */
+void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len) {
+  int last_seq;
+  bt_packet_list *prev = NULL;
+  bt_packet_list *cur = chunk->packets;
+  
+  if (cur == NULL) {
+    //printf("initialize packet list\n");
+    bt_packet_list *newp = malloc(sizeof(bt_packet_list));
+    newp->seq_num = seq_num;
+    newp->recv = 1;
+    newp->data = malloc(data_len);
+    memcpy(newp->data, data, data_len);
+    newp->next = NULL;
+    chunk->packets = newp;
+    return;
+  }
+  
+  // Check if node already exists.
+  //printf("searching packet list\n");
+  while (cur != NULL) {
+    //printf("seqnum: %d\n", cur->seq_num);
+    last_seq = cur->seq_num;
+    if (last_seq == seq_num) {
+      cur->recv = 1;
+      cur->data = malloc(data_len);
+      memcpy(cur->data, data, data_len);
+      return;
+    }
+    prev = cur;
+    cur = cur->next;
+  }
+  
+  // Create new nodes.
+  //printf("adding new packet list\n");
+  int i;
+  for (i = last_seq + 1; i <= seq_num; i++) {
+    bt_packet_list *newp = malloc(sizeof(bt_packet_list));
+    newp->seq_num = i;
+    if (i == seq_num) {
+      //printf("added!\n");
+      newp->recv = 1;
+      newp->data = malloc(data_len);
+      memcpy(newp->data, data, data_len);
+    }
+    else {
+      newp->recv = 0;
+      newp->data = NULL;
+    }
+    newp->next = NULL;
+    //printf("prev: %d\n", prev->seq_num);
+    prev->next = newp;
+    prev = newp;
+  }
+}
+
+/**
+ * Deletes a packet list from a chunk.
+ */
+void del_packet_list(bt_chunk_list *chunk) {
+  if (chunk == NULL) return;
+  bt_packet_list *pl = chunk->packets;
+  while (pl != NULL) {
+    bt_packet_list *tmp = pl->next;
+    if (pl->data != NULL) free(pl->data);
+    free(pl);
+    pl = tmp;
+  }
+}
+
+/**
+ * Keeps a chunk in order.
+ */
+void add_receiver_list(bt_config_t *c, char *hash) {
+  assert(c != NULL);
+  bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
+  memcpy(chunk->hash, hash, 20);
+  chunk->next_expected = 0;
+  chunk->peer = NULL;
+  chunk->peers = NULL;
+  chunk->packets = NULL;
+  chunk->next = NULL;
+  // If front of list doesn't exist:
+  if (c->download == NULL) c->download = chunk;
+  // If back of list does exist:
+  if (c->download_tail != NULL) c->download_tail->next = chunk;
+  // Add to back of list:
+  c->download_tail = chunk;
+}
+
+/**
+ * Deletes the chunk list.
+ */
+void del_receiver_list(bt_config_t* c) {
+  assert(c != NULL);
+  
+  bt_chunk_list *chunk = c->download;
+  while (chunk != NULL) {
+    bt_chunk_list *tmp = chunk->next;
+    if (chunk->peers != NULL) del_peer_list(chunk);
+    if (chunk->packets != NULL) del_packet_list(chunk);
+    free(chunk);
+    chunk = tmp;
+  }
+  c->download = NULL;
+  c->download_tail = NULL;
+}
+
+/**
+ * Adds a connection to the sender_list.
+ */
+void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packets, bt_peer_t *peer) {
+  assert(c != NULL);
+  bt_sender_list *sender = malloc(sizeof(bt_sender_list));
+  memcpy(sender->hash, hash, 20);
+  
+  sender->packets = packets;
+  sender->num_packets = num_packets;
+  
+  sender->last_acked = 0;
+  sender->last_sent = 0;
+  sender->window_size = 1;
+  sender->state = 0;
+  sender->retransmit = 0;
+  sender->peer = peer;
+  
+  sender->prev = NULL;
+  sender->next = c->upload;
+  if (c->upload != NULL) c->upload->prev = sender;
+  c->upload = sender;
+}
+
+/**
+ * Deletes a connection from the sender_list.
+ */
+void del_sender_list(bt_config_t *c, bt_sender_list *sender) {
+  assert(c != NULL);
+  if (sender == NULL) return;
+  bt_sender_list *before = sender->prev;
+  bt_sender_list *after = sender->next;
+  
+  if (sender->packets != NULL) {      
+    int i;
+    for (i = 0; i < sender->num_packets; i++) {
+      if (sender->packets[i] != NULL) free(sender->packets[i]);
+    }
+    free(sender->packets);
+  }
+  
+  if (before != NULL) before->next = after;
+  if (before == NULL) c->upload = after;
+  if (after != NULL) after->prev = before;
+  
+  free(sender);
 }
