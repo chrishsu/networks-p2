@@ -43,6 +43,7 @@ int has_chunk(char *hash, bt_config_t *config) {
 // @param config Config object
 // @return -1 on error, or else the result of send_ihave
 int process_whohas(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
+  DPRINTF(DEBUG_INIT, "process_whohas...\n");
   #define PAD 4
   chunk_list *chunks, *next;
   char num_chunks;
@@ -146,7 +147,7 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
     bt_peer_t *peer = config->peers;
     while (peer != NULL) {
       if (peer->id != config->identity)
-        send_udp(sock, &(peer->addr), &p, config);
+	packet_new(&p, &(peer->addr));
       peer = peer->next;
     }
     DPRINTF(DEBUG_INIT, "Flooded peers with WHOHAS\n");

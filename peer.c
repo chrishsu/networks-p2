@@ -66,17 +66,19 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     return;
   }
 
+  printf("Read packet!\n");
   packet p;
   memcpy(&p.header, buf, sizeof(packet_head));
-  p.buf = malloc(p.header.packet_len - p.header.header_len);
-  memcpy(p.buf, buf + p.header.header_len, p.header.packet_len - p.header.header_len);
+  p.buf = malloc(ntohs(p.header.packet_len) - ntohs(p.header.header_len));
+  memcpy(p.buf, buf + ntohs(p.header.header_len), ntohs(p.header.packet_len) - ntohs(p.header.header_len));
 
   printf("Incoming message from %s:%d\n",
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port));
 
+  DPRINTF(DEBUG_INIT, "\n\nSwitching: %d\n", (int)p.header.type);
   //TODO(David): process UDP request
-  switch(p.header.version) {
+  switch(p.header.type) {
   case TYPE_WHOHAS:
     //TODO(Chris): process WHOHAS
     process_whohas(sock, &from, &p, config);
@@ -86,6 +88,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     process_ihave(sock, &from, &p, config);
     break;
   case DROPPED:
+    DPRINTF(DEBUG_INIT, "DROPPED!\n");
     break;
   default:
     DPRINTF(DEBUG_INIT, "TYPE: %d\n", p.header.type);
@@ -183,6 +186,7 @@ void peer_run(bt_config_t *config) {
       }
 
       if (FD_ISSET(sock, &readfds)) {
+	printf("Got packet!\n\n");
         process_inbound_udp(sock, config);
       }
 
