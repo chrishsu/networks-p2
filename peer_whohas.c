@@ -1,7 +1,8 @@
 #include "peer_whohas.h"
 
-// Returns true iff h1 and h2 are the same hash
-//
+// @param h1 First hash
+// @param h2 Second hash
+// @return Whether h1 and h2 are the same hash
 int hash_equal(char *h1, char *h2) {
   int i;
   for (i = 0; i < 20; i++) {
@@ -11,6 +12,9 @@ int hash_equal(char *h1, char *h2) {
   return 1;
 }
 
+// @param hash Chunk to check for
+// @param config Config object
+// @return Whether this peer has the chunk with the hash in hash
 int has_chunk(char *hash, bt_config_t *config) {
   FILE *has_chunk_file = fopen(config->has_chunk_file, "r");
   if (has_chunk_file == NULL) {
@@ -33,31 +37,26 @@ int has_chunk(char *hash, bt_config_t *config) {
   return 0;
 }
 
-/*
- * @param[in]   buf
- *      guaranteed to have length of 1500 bytes
- */
-int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config_t *config) {
+// @param sock Socket
+// @param from From address
+// @param h Header of sending peer
+// @param config Config object
+// @return -1 on error, or else the result of send_ihave
+int process_whohas(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
   #define PAD 4
   chunk_list *chunks, *next;
-  short OFFSET;
   char num_chunks;
-  int i, ret;
+  int ret;
 
   chunks = init_chunk_list();
   next = NULL;
-  //get the number of chunks
-  if (h->head_len < 16) {
-    printf("header is less than 16!\n");
-    return -1; //something is wrong
-  }
-  num_chunks = h->buf[h->head_len];
-  OFFSET = sizeof(packet_head) + PAD;
+  num_chunks = p->buf[0];
 
   //loop through
-  for (i = 0; i < (int)num_chunks; i++) {
+  char i;
+  for (i = 0; i < num_chunks; i++) {
     char hash[20];
-    memcpy(hash, &(h->buf[OFFSET + 20*i]), 20);
+    memcpy(hash, &(p->buf[PAD + 20 * i]), 20);
 
     if (has_chunk(hash, config)) {
       next = add_to_chunk_list(next, hash);
@@ -81,22 +80,31 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
   return ret;
 }
 
-// Assumes c is in a-z or 0-9
+// Assumes c is in a-f or 0-9
+// @param c Character
+// @return Value of c as a hex digit
 char hexVal(char c) {
   if (c < 60)
     return c - 48;
   return c - 87;
 }
+
+// @param h Hex digit
+// @return Ascii value of character representing h
 char charVal(char h) {
   if (h < 10)
     return h + 48;
   return h + 87;
 }
 
+// @param sock Socket
+// @param chunkfile Chunk-file filename
+// @param config Config object
+// @return 0 on success, -1 on error
 int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Send WHOHAS\n");
     FILE *file;
-    peer_header h;
+    packet p;
     int lines = 0;
     char nl;
     int i;
@@ -114,12 +122,9 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
     fseek(file, 0L, SEEK_SET);
 
     //allocate space
-    init_peer_header(&h);
-    h.buf = malloc(4 + (lines * 20));
-    h.buf[0] = lines & 0xFF; // Number of chunk hashes
-    h.buf[1] = 0;
-    h.buf[2] = 0;
-    h.buf[3] = 0;
+    p.buf = malloc(PAD + (lines * 20));
+    p.buf[0] = lines & 0xFF; // Number of chunk hashes
+    p.buf[1] = p.buf[2] = p.buf[3] = 0;
 
     for (i = 0; i < lines; i++) {
       int id;
@@ -128,25 +133,26 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
 
       uint8_t binary[20];
       hex2binary(hash_part, 40, binary);
-      memcpy(&h.buf[4 + i * 20], binary, 20);
+      memcpy(&p.buf[4 + i * 20], binary, 20);
     }
 
     //header setup
-    h.type = TYPE_WHOHAS;
-    h.buf_len = 4 + (lines * 20);
-    h.pack_len = h.buf_len + 16;
-
+    p.header.magic_num = htons(15441);
+    p.header.version = 1;
+    p.header.type = TYPE_WHOHAS;
+    p.header.header_len = htons(16);
+    p.header.packet_len = htons(p.header.header_len + 4 + lines * 20);
 
     bt_peer_t *peer = config->peers;
     while (peer != NULL) {
       if (peer->id != config->identity)
-        send_udp(sock, &(peer->addr), &h, config);
+        send_udp(sock, &(peer->addr), &p, config);
       peer = peer->next;
     }
     DPRINTF(DEBUG_INIT, "Flooded peers with WHOHAS\n");
 
     //cleanup
-    free_peer_header(&h);
+    free(p.buf);
 
     return 0;
 }

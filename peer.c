@@ -60,30 +60,35 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   char buf[BUFLEN];
 
   fromlen = sizeof(from);
-  spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+  int bytes_read = spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+  if (bytes_read < sizeof(packet_head)) {
+    fprintf(stderr, "Error reading in process_inbound_udp!\n");
+    return;
+  }
+
+  packet p;
+  memcpy(&p.header, buf, sizeof(packet_head));
+  p.buf = malloc(p.header.packet_len - p.header.header_len);
+  memcpy(p.buf, buf + p.header.header_len, p.header.packet_len - p.header.header_len);
 
   printf("Incoming message from %s:%d\n",
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port));
 
-  peer_header h;
-  init_peer_header(&h);
-  h.buf = buf;
-
   //TODO(David): process UDP request
-  switch(process_udp(&h)) {
+  switch(p.header.version) {
   case TYPE_WHOHAS:
     //TODO(Chris): process WHOHAS
-    process_whohas(sock, &from, &h, config);
+    process_whohas(sock, &from, &p, config);
     break;
   case TYPE_IHAVE:
     //TODO(David): process IHAVE
-    process_ihave(&from, &h, config);
+    process_ihave(sock, &from, &p, config);
     break;
   case DROPPED:
     break;
   default:
-    DPRINTF(DEBUG_INIT, "TYPE: %d\n", h.type);
+    DPRINTF(DEBUG_INIT, "TYPE: %d\n", p.header.type);
     // Not yet implemented
     break;
   }
@@ -160,7 +165,7 @@ void peer_run(bt_config_t *config) {
         }
         DPRINTF(DEBUG_INIT, "Trying to send %d bytes...\t", (int)(pq->len));
 
-        int bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, pq->dest_addr, sizeof(*(pq->dest_addr)));
+        int bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr*)pq->dest_addr, sizeof(*(pq->dest_addr)));
         DPRINTF(DEBUG_INIT, "sent %d bytes\n", (int)bytes_sent);
         if (bytes_sent < 0) {
           fprintf(stderr, "Error sending packet\n");

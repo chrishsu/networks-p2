@@ -21,7 +21,7 @@
 /**
  * Processes an IHAVE packet, adds to the master chunk_list.
  */
-int process_ihave(struct sockaddr_in *from, packet *p, bt_config_t *config);
+int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config);
 
 /**
  * Sends an IHAVE packet.

@@ -32,6 +32,7 @@ void del_chunk_list(chunk_list *list) {
   free(list);
 }
 
+/*
 void init_peer_header(peer_header *h) {
   h->type = -1;
   h->pack_len = 0;
@@ -44,16 +45,16 @@ void init_peer_header(peer_header *h) {
 void free_peer_header(peer_header *h) {
   if (h->buf != NULL) free(h->buf);
   h->buf = NULL;
-}
+  }*/
 
-
-int process_udp(peer_header *h) {
+/*
+int process_udp(packet *p) {
   printf("Processing header..\n");
-  short magic_num = ntohs(*(short *)(h->buf));
-  char version = *(char *)(h->buf + 2);
+  short magic_num = ntohs(*(short *)(p->header.magic_num));
+  char version = *(char *)(p->header.version);
   if (magic_num != 15441 ||
       version != 1) {
-    //printf("magic_num: %d\tversion: %d\n", magic_num, version);
+    DPRINTF(DEBUG_INIT, "Bad: magic_num: %d\tversion: %d\n", magic_num, version);
     return DROPPED; // Drop the packet
   }
   h->type = *(char *)(h->buf + 3);
@@ -63,10 +64,14 @@ int process_udp(peer_header *h) {
   h->seq_num = ntohl(*(int *)(h->buf + 8));
   h->ack_num = ntohl(*(int *)(h->buf + 12));
   return h->type;
-}
+  }*/
 
-int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *config) {
+/*
+// Assumes p has network byte order already
+int send_udp(int sock, struct sockaddr_in *toaddr, packet *p, bt_config_t *config) {
   printf("Sending udp...\n");
+
+
   packet_head ph;
   ph.magic_num = htons(15441);
   ph.version = 1; // No byte conversion required
@@ -78,11 +83,15 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
 
   //printf("Packet len = %d\n", (int)(h->pack_len));
 
-  char *packet = malloc(h->pack_len);
+  char *packet_buf = malloc(p->header->packet_len);
   if (!packet) {
     // Failed allocating packet string
     return -1;
   }
+  memcpy(packet_buf, p, p->header->packet_len);
+
+
+
   memcpy(packet, &ph, sizeof(ph));
   memcpy(packet + sizeof(ph), h->buf, h->buf_len);
 
@@ -91,4 +100,4 @@ int send_udp(int sock, struct sockaddr_in *toaddr, peer_header *h, bt_config_t *
   packet_new(packet, h->pack_len, (struct sockaddr *)newaddr);
 
   return 0;
-}
+  }*/

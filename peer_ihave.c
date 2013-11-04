@@ -1,6 +1,6 @@
 #include "peer_ihave.h"
 
-int process_ihave(struct sockaddr_in *from, peer_header *h, bt_config_t *config) {
+int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
   printf("Process IHAVE\n");
   return 0;
 }
@@ -17,10 +17,11 @@ int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_
     if (num_chunks > max_chunks)
       num_chunks = max_chunks;
 
+    packet p;
     peer_header ph;
-    ph.type = 1;
-    ph.buf_len = 4 + CHUNK_SIZE * num_chunks;
-    ph.pack_len = sizeof(packet_head) + ph.buf_len;
+    p.header.type = 1;
+    p.header.buf_len = 4 + CHUNK_SIZE * num_chunks;
+    p.header.packet_len = sizeof(packet_head) + ph.buf_len;
     // We don't care about the seq or ack nums
 
     //printf("total chunks: %d\n", total_chunks);
@@ -37,10 +38,8 @@ int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_
       next = next->next;
       next_loc += 20;
     }
-    ph.buf = buf;
-    int ret_val = send_udp(sock, toaddr, &ph, config);
-    if (ret_val < 0)
-      return ret_val;
+    packet_new(&p, toaddr);
+
     total_chunks -= num_chunks;
 
     printf("Added IHAVE to queue with %d chunks\n", num_chunks);

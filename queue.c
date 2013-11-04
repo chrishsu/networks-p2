@@ -2,7 +2,6 @@
 
 packet_queue *head;
 packet_queue *tail;
-int PQindex;
 
 /**
  * Initializes the packet_queue.
@@ -10,7 +9,6 @@ int PQindex;
 void packet_init() {
   head = NULL;
   tail = NULL;
-  PQindex = 0;
 }
 
 /**
@@ -33,24 +31,29 @@ int packet_empty() {
  * @param[in] a
  *    The sockaddr struct.
  */
-void packet_new(char *b, size_t l, struct sockaddr *a) {
+void packet_new(packet *p, struct sockaddr_in *a) {
   packet_queue *n = malloc(sizeof(packet_queue));
-  PQindex++;
-  n->idx = PQindex;
-  n->buf = b;
-  n->len = l;
-  n->dest_addr = a;
+
+  n->buf = malloc(p->header.packet_len);
+  memcpy(n->buf, p, p->header.packet_len);
+
+  n->len = p->header.packet_len;
+
+  n->dest_addr = malloc(sizeof(struct sockaddr_in));
+  memcpy(n->dest_addr, a, sizeof(struct sockaddr_in));
+
   n->next = NULL;
   packet_push(n);
 }
 
+/*
 void packet_inspect() {
   int lh, lt;
   lh = 0; lt = 0;
   if (head != NULL) lh = (int)head->idx;
   if (tail != NULL) lt = (int)tail->idx;
   printf("head: %d\ttail:%d\n", lh, lt);
-}
+  }*/
 
 /**
  * Adds a packet to the queue.
