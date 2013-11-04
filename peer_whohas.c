@@ -1,5 +1,7 @@
 #include "peer_whohas.h"
 
+// Returns true iff h1 and h2 are the same hash
+//
 int hash_equal(char *h1, char *h2) {
   int i;
   for (i = 0; i < 20; i++) {
@@ -49,38 +51,20 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
     printf("header is less than 16!\n");
     return -1; //something is wrong
   }
-  num_chunks = h->buf[h->head_len]; //correct usage of ntohs?
+  num_chunks = h->buf[h->head_len];
   OFFSET = sizeof(packet_head) + PAD;
-  //printf("head_len: %d\tchunks: %X\n", h->head_len, num_chunks);
 
   //loop through
   for (i = 0; i < (int)num_chunks; i++) {
     char hash[20];
     memcpy(hash, &(h->buf[OFFSET + 20*i]), 20);
 
-    //printf("looking at hash: \n");
-
-    int k;
-    for (k = 0; k < 20; k++) {
-      //uint8_t c = hash[k];
-      char *hex = (char *)malloc(2);
-      //binary2hex(&c, 1, hex);
-      //printf("%s ", hex);
-      free(hex);
-    }
     if (has_chunk(hash, config)) {
-      printf("Adding...\n");
       next = add_to_chunk_list(next, hash);
       if (i == 0)
 	chunks = next;
-    } else
-      printf("Skipping...\n");
-
-      //next = add_to_chunk_list(next, hash);
-      //if (i == 0) chunks = next;
-      //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
+    }
   }
-  //printf("total chunks: %d \t%d\n", i, chunk_list_len(chunks));
 
   struct sockaddr_in toaddr;
   bzero(&toaddr, sizeof(toaddr));
@@ -89,7 +73,7 @@ int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config
   toaddr.sin_port = from->sin_port;
 
   ret = send_ihave(sock, &toaddr, config, chunks);
-  printf("Called send_ihave\n");
+  DPRINTF(DEBUG_INIT, "Called send_ihave\n");
 
   //cleanup
   del_chunk_list(chunks);
@@ -110,7 +94,7 @@ char charVal(char h) {
 }
 
 int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
-  printf("Send WHOHAS\n");
+  DPRINTF(DEBUG_INIT, "Send WHOHAS\n");
     FILE *file;
     peer_header h;
     int lines = 0;
@@ -159,7 +143,7 @@ int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
         send_udp(sock, &(peer->addr), &h, config);
       peer = peer->next;
     }
-    printf("Flooded peers with WHOHAS\n");
+    DPRINTF(DEBUG_INIT, "Flooded peers with WHOHAS\n");
 
     //cleanup
     free_peer_header(&h);
