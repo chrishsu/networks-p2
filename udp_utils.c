@@ -32,6 +32,29 @@ void del_chunk_list(chunk_list *list) {
   free(list);
 }
 
+/**
+ * Initializes the packet_head.
+ *
+ * @param[in/out] h
+ *      The packet_head.
+ * @param[in] type
+ * @param[in] header_len
+ * @param[in] packet_len
+ * @param[in] seq_num
+ * @param[in] ack_num
+ */
+void init_packet_head(packet_head *h, char type,
+                      short header_len, short packet_len,
+                      int seq_num, int ack_num) {
+  h->magic_num = htons(15441);
+  h->version = 1;
+  h->type = type;
+  h->header_len = htons(header_len);
+  h->packet_len = htons(packet_len);
+  h->seq_num = htonl(seq_num);
+  h->seq_num = htonl(seq_num);
+}
+
 /*
 void init_peer_header(peer_header *h) {
   h->type = -1;

@@ -52,17 +52,21 @@ chunk_list *add_to_chunk_list(chunk_list *list, char *hash);
 int chunk_list_len(chunk_list *list);
 void del_chunk_list(chunk_list *list);
 
+void init_packet_head(packet_head *h, char type,
+                      short header_len, short packet_len,
+                      int seq_num, int ack_num);
+
 //void init_peer_header(peer_header *h);
 //void free_peer_header(peer_header *h);
 
 /*
  * @returns The type of request, or -1 if invalid type.
  */
-int process_udp(packet *p);
+//int process_udp(packet *p);
 
 /*
  * Creates p2p header and UDP header, then sends the packet.
  */
-int send_udp(int sock, struct sockaddr_in *toaddr, packet *p, bt_config_t *config);
+//int send_udp(int sock, struct sockaddr_in *toaddr, packet *p, bt_config_t *config);
 
 #endif
