@@ -18,8 +18,14 @@
 #include "queue.h"
 #include "peer_whohas.h"
 
-int process_ihave(struct sockaddr_in *from, peer_header *h, bt_config_t *config);
+/**
+ * Processes an IHAVE packet, adds to the master chunk_list.
+ */
+int process_ihave(struct sockaddr_in *from, packet *p, bt_config_t *config);
 
+/**
+ * Sends an IHAVE packet.
+ */
 int send_ihave(int sock, struct sockaddr_in *toaddr, bt_config_t *config, chunk_list *chunks);
 
 #endif

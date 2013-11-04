@@ -8,10 +8,13 @@
 #include "chunk.h"
 
 /*
- * Calls send_ihave()
+ * Processes a WHOHAS request then sends an IHAVE packet.
  */
-int process_whohas(int sock, struct sockaddr_in *from, peer_header *h, bt_config_t *config);
+int process_whohas(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config);
 
+/**
+ * Sends WHOHAS request to all peers.
+ */
 int send_whohas(int sock, char *chunkfile, bt_config_t *config);
 
 #endif
