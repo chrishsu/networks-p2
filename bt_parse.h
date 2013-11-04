@@ -12,9 +12,6 @@
 #ifndef _BT_PARSE_H_
 #define _BT_PARSE_H_
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include "udp_utils.h"
 
 #define BT_FILENAME_LEN 255
@@ -22,9 +19,12 @@
 
 typedef char flag;
 
+struct bt_chunk_list;
+
 typedef struct bt_peer_s {
   short  id;
   flag downloading;
+  struct bt_chunk_list *chunk;
   struct sockaddr_in addr;
   struct bt_peer_s *next;
 } bt_peer_t;
@@ -42,15 +42,16 @@ typedef struct bt_packet_list {
 } bt_packet_list;
 
 typedef struct bt_chunk_list {
-  char[20] hash;
+  char hash[20];
   int next_expected;
+  bt_peer_t *peer;
   bt_peer_list *peers;
   bt_packet_list *packets;
   struct bt_chunk_list *next;
 } bt_chunk_list;
 
 typedef struct bt_sender_list {
-  char[20] hash;
+  char hash[20];
   packet **packets;
   int num_packets;
   int last_acked;
@@ -58,6 +59,8 @@ typedef struct bt_sender_list {
   int window_size;
   flag state; // start or avoid
   char retransmit;
+  bt_peer_t *peer;
+  struct bt_sender_list *prev;
   struct bt_sender_list *next;
 } bt_sender_list;
 
@@ -78,6 +81,7 @@ struct bt_config_s {
   int cur_download;
   int cur_upload;
   bt_chunk_list *download;
+  bt_chunk_list *download_tail; // DO NOT ACCESS
   bt_sender_list *upload;
 };
 typedef struct bt_config_s bt_config_t;
@@ -89,7 +93,13 @@ void bt_parse_peer_list(bt_config_t *c);
 void bt_dump_config(bt_config_t *c);
 bt_peer_t *bt_peer_info(const bt_config_t *c, int peer_id);
 
-void add_chunk_list(bt_config_t *c, char *hash);
-void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packets);
+void add_peer_list(bt_chunk_list *chunk, bt_peer_t *peer);
+void del_peer_list(bt_chunk_list *chunk);
+void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len);
+void del_packet_list(bt_chunk_list *chunk);
+void add_receiver_list(bt_config_t *c, char *hash);
+void del_receiver_list(bt_config_t* c);
+void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packets, bt_peer_t *peer);
+void del_sender_list(bt_config_t *c, bt_sender_list *sender);
 
 #endif /* _BT_PARSE_H_ */
