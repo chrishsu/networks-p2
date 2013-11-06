@@ -21,9 +21,9 @@
 #include "bt_parse.h"
 #include "input_buffer.h"
 #include "udp_utils.h"
-#include "peer_whohas.h"
-#include "peer_ihave.h"
 #include "queue.h"
+#include "peer_receiver.h"
+#include "peer_sender.h"
 
 void peer_run(bt_config_t *config);
 
@@ -67,11 +67,16 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     return;
   }
 
-  printf("Read packet!\n");
+  DPRINTF(DEBUG_INIT, "Read packet!\n");
   packet p;
   memcpy(&p.header, buf, sizeof(packet_head));
   if (ntohsp.header.packet_len != bytes_read) {
     fprintf("Packet has wrong packet_len!\n");
+    return;
+  }
+  if (ntohs(p.header.magic_num) != 15441 ||
+      p.header.version != 1) {
+    fprintf("Packet has bad magic_num or version\n");
     return;
   }
 
@@ -83,15 +88,21 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 	 ntohs(from.sin_port));
 
   DPRINTF(DEBUG_INIT, "\n\nSwitching: %d\n", (int)p.header.type);
-  //TODO(David): process UDP request
   switch(p.header.type) {
   case TYPE_WHOHAS:
-    //TODO(Chris): process WHOHAS
     process_whohas(sock, &from, &p, config);
     break;
   case TYPE_IHAVE:
-    //TODO(David): process IHAVE
     process_ihave(sock, &from, &p, config);
+    break;
+  case TYPE_GET:
+    process_get(sock, &from, &p, config);
+    break;
+  case TYPE_DATA:
+    process_data(sock, &from, &p, config);
+    break;
+  case TYPE_ACK:
+    process_ack(sock, &from, &p, config);
     break;
   case DROPPED:
     DPRINTF(DEBUG_INIT, "DROPPED!\n");
@@ -103,12 +114,12 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   }
 }
 
-void process_get(int sock, char *chunkfile, char *outputfile, bt_config_t *config) {
-  DPRINTF(DEBUG_INIT, "Process GET (%s, %s)\n", chunkfile, outputfile);
+void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *config) {
+  DPRINTF(DEBUG_INIT, "Process User GET (%s, %s)\n", chunkfile, outputfile);
 
   FILE *CFILE;
   CFILE = fopen(chunkfile, "r");
-  if (file == NULL) {
+  if (CFILE == NULL) {
     printf("No chunkfile!\n");
     return -1;
   }
@@ -122,6 +133,7 @@ void process_get(int sock, char *chunkfile, char *outputfile, bt_config_t *confi
     hex2binary(hash_text, 40, hash);
     bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
     memcpy(chunk->hash, hash, 20);
+    chunk->id = id;
     chunk->next_expected = INIT_SEQNUM;
     chunk->total_data = 0;
     chunk->peer = NULL;
@@ -149,7 +161,7 @@ void handle_user_input(int sock, char *line, bt_config_t *config) {
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
       printf("\n");
-      process_get(sock, chunkf, outf, config);
+      process_user_get(sock, chunkf, outf, config);
     }
     else {
       printf("Usage: GET [chunk-file] [out-file]\n\n");
@@ -157,6 +169,48 @@ void handle_user_input(int sock, char *line, bt_config_t *config) {
   }
 }
 
+void peer_packet_ops() { 
+  packet_queue *pq = packet_pop();
+  if (pq == NULL) return;
+  DPRINTF(DEBUG_INIT, "Trying to send %d bytes...\t", (int)(pq->len));
+
+  int bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr*)pq->dest_addr, sizeof(*(pq->dest_addr)));
+  DPRINTF(DEBUG_INIT, "sent %d bytes\n", (int)bytes_sent);
+  if (bytes_sent < 0) {
+    fprintf(stderr, "Error sending packet\n");
+  } else {
+    size_t new_len = pq->len - bytes_sent;
+    if (new_len > 0) {
+      memcpy(pq->buf, pq->buf + bytes_sent, new_len);
+      pq->len = new_len;
+      packet_push(pq);
+    } else {
+      packet_free(pq);
+    }
+  }
+}
+
+/** Congestion Control **/
+void peer_cc(bt_config_t *config) {
+  bt_sender_t *sender = config->upload;
+  /* Iterate through connections */
+  while (sender != NULL) {
+    // if we have sent everything and been acked, cleanup
+    if (sender->num_packets == sender->last_acked) {
+      bt_sender_t *tmp = sender->next;
+      del_sender_list(config, sender);
+      sender = tmp;
+      continue;
+    }
+    
+    // lost packet
+    // timeout
+    
+    // queue up packets up to window size
+    
+    sender = sender->next;
+  }
+}
 
 void peer_run(bt_config_t *config) {
   int sock;
@@ -189,40 +243,25 @@ void peer_run(bt_config_t *config) {
     int nfds;
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
+    
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    
     if (!packet_empty()) {
       FD_SET(sock, &writefds);
     }
 
-    nfds = select(sock+1, &readfds, &writefds, NULL, NULL);
+    nfds = select(sock+1, &readfds, &writefds, NULL, &timeout);
 
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
-        packet_queue *pq = packet_pop();
-        if (pq == NULL) {
-          FD_CLR(sock, &writefds);
-          continue;
-        }
-        DPRINTF(DEBUG_INIT, "Trying to send %d bytes...\t", (int)(pq->len));
-
-        int bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr*)pq->dest_addr, sizeof(*(pq->dest_addr)));
-        DPRINTF(DEBUG_INIT, "sent %d bytes\n", (int)bytes_sent);
-        if (bytes_sent < 0) {
-          fprintf(stderr, "Error sending packet\n");
-        } else {
-          size_t newLen = pq->len - bytes_sent;
-          if (newLen > 0) {
-            memcpy(pq->buf, pq->buf + bytes_sent, newLen);
-            pq->len = newLen;
-            packet_push(pq);
-          } else {
-            packet_free(pq);
-          }
-        }
+        peer_packet_ops();
         FD_CLR(sock, &writefds);
       }
 
       if (FD_ISSET(sock, &readfds)) {
-	printf("Got packet!\n\n");
+        DPRINTF(DEBUG_INIT, "Got packet!\n\n");
         process_inbound_udp(sock, config);
       }
 
@@ -230,5 +269,7 @@ void peer_run(bt_config_t *config) {
         process_user_input(STDIN_FILENO, userbuf, handle_user_input, sock, config);
       }
     }
+    
+    peer_cc(config);
   }
 }
