@@ -30,7 +30,7 @@ void bt_init(bt_config_t *config, int argc, char **argv) {
   strcpy(config->peer_list_file, "nodes.map");
   config->argc = argc;
   config->argv = argv;
-  
+
   config->cur_download = 0;
   config->cur_upload = 0;
   config->download = NULL;
@@ -212,7 +212,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
   int last_seq;
   bt_packet_list *prev = NULL;
   bt_packet_list *cur = chunk->packets;
-  
+
   if (cur == NULL) {
     //printf("initialize packet list\n");
     bt_packet_list *newp = malloc(sizeof(bt_packet_list));
@@ -224,7 +224,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
     chunk->packets = newp;
     return;
   }
-  
+
   // Check if node already exists.
   //printf("searching packet list\n");
   while (cur != NULL) {
@@ -239,7 +239,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
     prev = cur;
     cur = cur->next;
   }
-  
+
   // Create new nodes.
   //printf("adding new packet list\n");
   int i;
@@ -302,7 +302,7 @@ void add_receiver_list(bt_config_t *c, char *hash) {
  */
 void del_receiver_list(bt_config_t* c) {
   assert(c != NULL);
-  
+
   bt_chunk_list *chunk = c->download;
   while (chunk != NULL) {
     bt_chunk_list *tmp = chunk->next;
@@ -322,17 +322,17 @@ void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packe
   assert(c != NULL);
   bt_sender_list *sender = malloc(sizeof(bt_sender_list));
   memcpy(sender->hash, hash, 20);
-  
+
   sender->packets = packets;
   sender->num_packets = num_packets;
-  
+
   sender->last_acked = 0;
   sender->last_sent = 0;
   sender->window_size = 1;
   sender->state = 0;
   sender->retransmit = 0;
   sender->peer = peer;
-  
+
   sender->prev = NULL;
   sender->next = c->upload;
   if (c->upload != NULL) c->upload->prev = sender;
@@ -362,32 +362,30 @@ void del_sender_list(bt_config_t *c, bt_sender_list *sender) {
   if (sender == NULL) return;
   bt_sender_list *before = sender->prev;
   bt_sender_list *after = sender->next;
-  
-  if (sender->packets != NULL) {      
+
+  if (sender->packets != NULL) {
     int i;
     for (i = 0; i < sender->num_packets; i++) {
       if (sender->packets[i] != NULL) free(sender->packets[i]);
     }
     free(sender->packets);
   }
-  
+
   if (before != NULL) before->next = after;
   if (before == NULL) c->upload = after;
   if (after != NULL) after->prev = before;
-  
+
   free(sender);
 }
 
-
-
 int master_data_file(char *file, bt_config_t *config) {
   FILE *chunk_file = fopen(config->chunk_file, "r");
-  if (has_chunk_file == NULL) {
+  if (chunk_file == NULL) {
     fprintf(stderr, "Error opening master-chunk-file\n");
     return 0;
   }
-  
-  if (fscanf(has_chunk_file, "File: %s", file) < 0) {
+
+  if (fscanf(chunk_file, "File: %s", file) < 0) {
     return 0;
   }
   return 1;
@@ -395,7 +393,7 @@ int master_data_file(char *file, bt_config_t *config) {
 
 /**
  * Checks if this peer has a chunk for the given hash.
- * 
+ *
  * @param hash Chunk to check for
  * @param config Config object
  *
@@ -421,4 +419,23 @@ int has_chunk(char *hash, bt_config_t *config) {
       return id;
   }
   return -1;
+}
+
+/**
+ * @param addr Address to find
+ * @param config Config struct
+ * @return Peer with address addr
+ */
+bt_peer_t *peer_with_addr(struct sockaddr_in *addr, bt_config_t *config) {
+  bt_peer_t *current = config->peers;
+  while (current != NULL) {
+    if (current->addr.sin_addr.s_addr == addr->sin_addr.s_addr &&
+	current->addr.sin_port == addr->sin_port)
+      return current;
+    /*
+    if (memcmp(addr, current->addr, sizeof(struct sockaddr_in)) == 0)
+      return current;
+    */
+  }
+  return NULL;
 }
