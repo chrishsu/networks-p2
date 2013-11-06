@@ -60,8 +60,9 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   char buf[BUFLEN];
 
   fromlen = sizeof(from);
-  int bytes_read = spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
-  if (bytes_read < sizeof(packet_head)) {
+  short bytes_read = spiffy_recvfrom(sock, buf, BUFLEN, 0, (struct sockaddr *) &from, &fromlen);
+  if (bytes_read <= 0 ||
+      bytes_read < (short)sizeof(packet_head)) {
     fprintf(stderr, "Error reading in process_inbound_udp!\n");
     return;
   }
@@ -69,6 +70,11 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   printf("Read packet!\n");
   packet p;
   memcpy(&p.header, buf, sizeof(packet_head));
+  if (ntohsp.header.packet_len != bytes_read) {
+    fprintf("Packet has wrong packet_len!\n");
+    return;
+  }
+
   p.buf = malloc(ntohs(p.header.packet_len) - ntohs(p.header.header_len));
   memcpy(p.buf, buf + ntohs(p.header.header_len), ntohs(p.header.packet_len) - ntohs(p.header.header_len));
 
@@ -100,8 +106,38 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 void process_get(int sock, char *chunkfile, char *outputfile, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Process GET (%s, %s)\n", chunkfile, outputfile);
 
-  //TODO(Chris): send WHOHAS
-  send_whohas(sock, chunkfile, config);
+  FILE *CFILE;
+  CFILE = fopen(chunkfile, "r");
+  if (file == NULL) {
+    printf("No chunkfile!\n");
+    return -1;
+  }
+  int id;
+  char hash_text[41];
+  uint8_t hash[20];
+
+  bt_chunk_list *chunks;
+  bt_chunk_list *last;
+  while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
+    hex2binary(hash_text, 40, hash);
+    bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
+    memcpy(chunk->hash, hash, 20);
+    chunk->next_expected = INIT_SEQNUM;
+    chunk->total_data = 0;
+    chunk->peer = NULL;
+    chunk->peers = NULL;
+    chunk->packets = NULL;
+
+    if (chunks == NULL)
+      chunks = chunk;
+    last->next = chunk;
+    last = chunk;
+  }
+  config->download = chunks;
+  config->cur_download = 0;
+  config->num_downloaded = 0;
+
+  send_whohas(sock, config);
 }
 
 void handle_user_input(int sock, char *line, bt_config_t *config) {
