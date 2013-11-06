@@ -32,10 +32,8 @@ int packet_empty() {
  *    The sockaddr struct.
  */
 void packet_new(packet *p, struct sockaddr_in *a) {
-  printf("first malloc\n");
   packet_queue *n = malloc(sizeof(packet_queue));
 
-  printf("packlen: %d\n", ntohs(p->header.packet_len));
   n->buf = malloc(ntohs(p->header.packet_len));
   memcpy(n->buf, &(p->header), sizeof(packet_head));
   memcpy(n->buf + sizeof(packet_head), p->buf, ntohs(p->header.packet_len) - sizeof(packet_head));
@@ -43,7 +41,6 @@ void packet_new(packet *p, struct sockaddr_in *a) {
   n->len = ntohs(p->header.packet_len);
 
   n->dest_addr = malloc(sizeof(struct sockaddr_in));
-  printf("third memcpy\n");
   memcpy(n->dest_addr, a, sizeof(struct sockaddr_in));
 
   n->next = NULL;

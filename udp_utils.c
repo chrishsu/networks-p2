@@ -1,5 +1,15 @@
 #include "udp_utils.h"
 
+long long time_millis() {
+  struct timeval t;
+  gettimeofday(&t, NULL);
+
+  long long seconds = t.tv_sec;
+  long long micro_frac = t.tv_usec;
+  long long millis = seconds * 1000 + micro_frac / 1000;
+  return millis;
+}
+
 chunk_list *init_chunk_list() {
   return NULL;
 }

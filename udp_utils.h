@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include "debug.h"
 #include "chunk.h"
 
@@ -44,6 +45,7 @@ typedef struct chunk_list {
     struct chunk_list *next;
 } chunk_list;
 
+long long time_millis();
 chunk_list *init_chunk_list();
 chunk_list *add_to_chunk_list(chunk_list *list, char *hash);
 int chunk_list_len(chunk_list *list);

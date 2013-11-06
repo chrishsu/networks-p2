@@ -118,6 +118,7 @@ int process_get(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
 
   // Only expecting 20 bytes
   if (ntohs(p->header.packet_len) - ntohs(p->header.header_len) != 20) {
+    fprintf(stderr, "Didn't get 20 bytes for the hash!\n");
     return -1;
   }
 
@@ -140,7 +141,7 @@ int process_get(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
  * @return -1 on error, or else 0.
  */
 int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config) {
-  #define MAX_DATA_SIZE 1500 - 16
+#define MAX_DATA_SIZE (1500 - 16)
   #define FILENAME_LEN 255
   int id;
   char filename[FILENAME_LEN];
@@ -159,7 +160,7 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
 
   FILE *master = fopen(filename, "rb");
   if (master == NULL) {
-    fprintf(stderr, "Error opening master-data-file\n");
+    fprintf(stderr, "Error opening master-data-file '%s'\n", filename);
     return -1;
   }
 
@@ -168,7 +169,11 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
   }
 
   read_bytes = fread(filechunk, sizeof(uint8_t), BT_CHUNK_SIZE, master);
-  if (read_bytes <= 0) return -1;
+  if (read_bytes <= 0) {
+    fprintf(stderr, "Read nonpositive number of bytes!\n");
+    return -1;
+  }
+  DPRINTF(DEBUG_INIT, "Read %d bytes\n", (int)read_bytes);
 
   // Check the hash.
   uint8_t checkhash[20];
@@ -177,10 +182,10 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     return -1;
   }
 
-  int num_packets = (int)read_bytes/MAX_DATA_SIZE;
+  int num_packets = ((int)read_bytes) / ((int)MAX_DATA_SIZE);
   if (num_packets * MAX_DATA_SIZE < (int)read_bytes) num_packets++;
 
-  packet **packets = (packet **)malloc(num_packets * sizeof(packet *));
+  packet **packets = (packet **)malloc(num_packets  * sizeof(packet *));
 
   int i, chunk_bytes;
   // Sequence Numbers start at 1
@@ -194,7 +199,7 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     p->buf = malloc(buf_len);
     memcpy(p->buf, filechunk + chunk_bytes, buf_len);
 
-    packets[i] = p;
+    packets[i - 1] = p;
 
     chunk_bytes += buf_len;
   }
@@ -209,7 +214,7 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
 
   add_sender_list(config, hash, packets, num_packets, peer);
 
-  DPRINTF(DEBUG_INIT, "Added to %d packets for peer %d to sender list\n", num_packets, peer->id);
+  DPRINTF(DEBUG_INIT, "Added %d packets for peer %d to sender list\n", num_packets, peer->id);
 
   return 0;
 }
@@ -226,7 +231,7 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
  * @return -1 on error, or else 0.
  */
 int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
-  DPRINTF(DEBUG_INIT, "Process ACK\n");
+  DPRINTF(DEBUG_INIT, "Process ACK #%d\n", ntohl(p->header.ack_num));
   bt_peer_t *peer = peer_with_addr(from, config);
   if (peer == NULL) {
     fprintf(stderr, "Didn't find a peer!\n");

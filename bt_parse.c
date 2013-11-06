@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include "bt_parse.h"
 #include "debug.h"
+#include "peer_receiver.h"
 
 static const char* const _bt_optstring = "p:c:f:m:i:d:h";
 
@@ -225,7 +226,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
     return;
   }
 
-  // Check if node already exists.
+   // Check if node already exists.
   //printf("searching packet list\n");
   while (cur != NULL) {
     //printf("seqnum: %d\n", cur->seq_num);
@@ -261,6 +262,17 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
     prev->next = newp;
     prev = newp;
   }
+  chunk->total_data += data_len;
+
+  int last_gotten_upto = 0;
+  cur = chunk->packets;
+  while (cur != NULL) {
+    if (!cur->recv)
+      break;
+    last_gotten_upto = cur->seq_num;
+    cur = cur->next;
+  }
+  chunk->next_expected = last_gotten_upto + 1;
 }
 
 /**
@@ -285,7 +297,7 @@ void add_receiver_list(bt_config_t *c, char *hash, int id) {
   bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
   memcpy(chunk->hash, hash, 20);
   chunk->id = id;
-  chunk->next_expected = 1;
+  chunk->next_expected = INIT_SEQNUM;
   chunk->total_data = 0;
   chunk->peer = NULL;
   chunk->peers = NULL;
@@ -297,6 +309,7 @@ void add_receiver_list(bt_config_t *c, char *hash, int id) {
   if (c->download_tail != NULL) c->download_tail->next = chunk;
   // Add to back of list:
   c->download_tail = chunk;
+  c->num_chunks++;
 }
 
 /**
@@ -437,10 +450,27 @@ bt_peer_t *peer_with_addr(struct sockaddr_in *addr, bt_config_t *config) {
     if (current->addr.sin_addr.s_addr == addr->sin_addr.s_addr &&
 	current->addr.sin_port == addr->sin_port)
       return current;
+    current = current->next;
     /*
     if (memcmp(addr, current->addr, sizeof(struct sockaddr_in)) == 0)
       return current;
     */
   }
   return NULL;
+}
+
+/**
+ * @param config
+ * Resets values for the all peers
+ */
+void reset_peers(bt_config_t *config) {
+  bt_peer_t *cur = config->peers;
+  while (cur != NULL) {
+    cur->bad = 0;
+    cur->chunk = NULL;
+    cur->downloading = 0;
+    // Not expecting response:
+    cur->last_response = -1;
+    cur = cur->next;
+  }
 }

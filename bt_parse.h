@@ -22,8 +22,11 @@ typedef char flag;
 struct bt_chunk_list;
 
 typedef struct bt_peer_s {
-  short  id;
+  short id;
+  // True iff we're downloading from this peer:
   flag downloading;
+  flag bad;
+  long long last_response;
   struct bt_chunk_list *chunk;
   struct sockaddr_in addr;
   struct bt_peer_s *next;
@@ -113,5 +116,6 @@ void del_sender_list(bt_config_t *c, bt_sender_list *sender);
 int master_data_file(char *file, bt_config_t *config);
 int has_chunk(char *hash, bt_config_t *config);
 bt_peer_t *peer_with_addr(struct sockaddr_in *addr, bt_config_t *config);
+void reset_peers(bt_config_t *config);
 
 #endif /* _BT_PARSE_H_ */

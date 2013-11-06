@@ -1,24 +1,43 @@
 #include "peer_receiver.h"
 
-// @param sock Socket
-// @param chunkfile Chunk-file filename
-// @param config Config object
-// @return 0 on success, -1 on error
+void timeout_check(int sock, bt_config_t *config) {
+  long long cur_time = time_millis();
+  bt_peer_t *cur = config->peers;
+  while (cur != NULL) {
+    if (cur_time - cur->last_response > TIMEOUT_MILLIS) {
+      cur->bad = 1;
+      cur->downloading = 0;
+      cur->chunk->peer = NULL;
+      cur->chunk = NULL;
+    }
+    cur = cur->next;
+  }
+}
+
+void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
+  if (chunk->peer != NULL) {
+    fprintf(stderr, "Uh oh! Trying to get a chunk we're currently downloading!!\n");
+  }
+  bt_peer_list *cur = chunk->peers;
+  while (cur != NULL) {
+    if (!cur->peer->downloading && !cur->peer->bad) {
+      send_get(sock, &(cur->peer->addr), chunk, config);
+      return;
+    }
+  }
+  // Reflood the network looking for the chunk:
+  send_whohas(sock, config);
+}
+
+/**
+ * @param sock Socket
+ * @param chunkfile Chunk-file filename
+ * @param config Config object
+ * @return 0 on success, -1 on error
+ */
 int send_whohas(int sock, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Send WHOHAS\n");
     packet p;
-
-    /*file = fopen(config->chunk_file, "r");
-    if (file == NULL) {
-      printf("No chunkfile!\n");
-        return -1;
-    }
-    //get lines
-    while ((nl = fgetc(file)) != EOF) {
-        if (nl == '\n') lines++;
-    }
-    //printf("end loop, lines = %X\n", lines & 0xFF);
-    fseek(file, 0L, SEEK_SET);*/
 
     //allocate space
     p.buf = malloc(4 + 20 * config->num_chunks);
@@ -33,25 +52,6 @@ int send_whohas(int sock, bt_config_t *config) {
       cur = cur->next;
     }
 
-    /*
-    for (i = 0; i < lines; i++) {
-      int id;
-      char hash_part[41];
-      fscanf(file, "%d %s", &id, hash_part);
-
-      uint8_t binary[20];
-      hex2binary(hash_part, 40, binary);
-      memcpy(&p.buf[4 + i * 20], binary, 20);
-      }*/
-
-    //header setup
-    /*p.header.magic_num = htons(15441);
-    p.header.version = 1;
-    p.header.type = TYPE_WHOHAS;
-    p.header.header_len = htons(16);
-    p.header.packet_len = htons(16 + 4 + config->num_chunks * 20);
-    p.header.seq_num = 0;
-    p.header.ack_num = 0;*/
     init_packet_head(&(p.header), TYPE_WHOHAS, 16,
                      16 + 4 + config->num_chunks * 20, 0, 0);
 
@@ -69,11 +69,16 @@ int send_whohas(int sock, bt_config_t *config) {
     return 0;
 }
 
+// Can't assume that downloading just started! This might be
+// after we've been downloading for a while and a peer when down.
 int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
   printf("Process IHAVE\n");
   bt_peer_t *peer = peer_with_addr(from, config);
+  peer->bad = 0;
+
   short datalen = ntohs(p->header.packet_len) - sizeof(packet_head);
   char numchunks = p->buf[0];
+  printf("numchunks = %d\n", numchunks);
   datalen -= 4; // We already read the number of chunks
   char *nextchunk = p->buf + 4;
   char i;
@@ -87,8 +92,15 @@ int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *co
     }
     memcpy(hash, nextchunk, 20);
     bt_chunk_list *cur = config->download;
+
+    uint8_t uhash[20];
+    memcpy(uhash, hash, 20);
+    char hashtext[41];
+    binary2hex(uhash, 20, hashtext);
+    DPRINTF(DEBUG_INIT, "Looking for hash '%s'\n", hashtext);
     while (cur != NULL) {
       if (hash_equal(hash, cur->hash)) {
+	DPRINTF(DEBUG_INIT, "Adding hash...\n");
 	add_peer_list(cur, peer);
 
 	if (cur->peer == NULL && !sent_get) {
@@ -125,8 +137,9 @@ int send_get(int sock, struct sockaddr_in *to, bt_chunk_list *chunk, bt_config_t
   chunk->packets = NULL;
 
   packet p;
-  init_packet_head(&(p.header), TYPE_GET, sizeof(packet_head), sizeof(packet_head), 0, 0);
-  p.buf = NULL;
+  init_packet_head(&(p.header), TYPE_GET, sizeof(packet_head), sizeof(packet_head) + 20, 0, 0);
+  p.buf = malloc(20);
+  memcpy(p.buf, chunk->hash, 20);
   packet_new(&p, to);
   DPRINTF(DEBUG_INIT, "Sent GET sucessfully!\n");
   return 0;
@@ -136,44 +149,12 @@ int send_get(int sock, struct sockaddr_in *to, bt_chunk_list *chunk, bt_config_t
  * Assumes you gave it a valid seq_num. If not, bad stuff happens like infinite mallocing o_O
  */
 void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) {
-  bt_packet_list *list = chunk->packets;
+  DPRINTF(DEBUG_INIT, "Add packet #%d\n", ntohl(p->header.seq_num));
   int seq_num = ntohl(p->header.seq_num);
   size_t data_len = ntohs(p->header.packet_len) - sizeof(packet_head);
 
-  chunk->total_data += data_len;
-  if (list == NULL) {
-    list = malloc(sizeof(bt_packet_list));
-    list->seq_num = INIT_SEQNUM;
-    list->recv = 0; // Haven't received it
-    list->next = NULL;
-  }
-  while (list->next != NULL && list->seq_num < seq_num)
-    list = list->next;
-  while (list->seq_num < seq_num) { // meaning list->next is NULL
-    // Add more elements to the end of the list:
-    bt_packet_list *extra = malloc(sizeof(bt_packet_list));
-    extra->seq_num = list->seq_num + 1;
-    extra->recv = 0;
-    extra->next = NULL;
-    list->next = extra;
-    list = list->next;
-  }
-  // Yay! list->seqnum == seq_num!!
-  list->recv = 1; // We got it
-  list->data = malloc(data_len);
-  memcpy(list->data, p->buf, data_len);
-  list->data_len = data_len;
-
-  if (seq_num == chunk->next_expected) {
-    int largest_gotten_upto = seq_num;
-    while (list != NULL) {
-      if (!list->recv)
-	break;
-      largest_gotten_upto = list->seq_num;
-      list = list->next;
-    }
-    chunk->next_expected = largest_gotten_upto;
-  }
+  // Well that's a lot shorter now! Thanks Chris! :)
+  add_packet_list(chunk, seq_num, p->buf, data_len);
 
   if (chunk->total_data == BT_CHUNK_SIZE)
     finish_chunk(sock, chunk, config);

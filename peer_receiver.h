@@ -18,6 +18,10 @@
 
 #define INIT_SEQNUM 1
 #define MAX_SEQNUM (INIT_SEQNUM - 1 + BT_CHUNK_SIZE)
+#define TIMEOUT_MILLIS 2000
+
+void timeout_check(int sock, bt_config_t *config);
+void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config);
 
 int send_whohas(int sock, bt_config_t *config);
 

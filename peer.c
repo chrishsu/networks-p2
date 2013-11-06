@@ -54,6 +54,7 @@ int main(int argc, char **argv) {
 
 
 void process_inbound_udp(int sock, bt_config_t *config) {
+  DPRINTF(DEBUG_INIT, "process_inbound_udp\n");
   #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
@@ -96,7 +97,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     process_ihave(sock, &from, &p, config);
     break;
   case TYPE_GET:
-    //process_get(sock, &from, &p, config);
+    process_get(sock, &from, &p, config);
     break;
   case TYPE_DATA:
     process_data(sock, &from, &p, config);
@@ -127,31 +128,14 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   char hash_text[41];
   uint8_t hash[20];
 
-  //bt_chunk_list *chunks;
-  //bt_chunk_list *last;
-  int num_chunks = 0;
-  while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
-    hex2binary(hash_text, 40, hash);
-    /*bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
-    memcpy(chunk->hash, hash, 20);
-    chunk->id = id;
-    chunk->next_expected = INIT_SEQNUM;
-    chunk->total_data = 0;
-    chunk->peer = NULL;
-    chunk->peers = NULL;
-    chunk->packets = NULL;
-
-    if (chunks == NULL)
-      chunks = chunk;
-    last->next = chunk;
-    last = chunk;*/
-    add_receiver_list(config, (char *)hash, id);
-    num_chunks++;
-  }
-  //config->download = chunks;
+  reset_peers(config);
+  config->num_chunks = 0;
   config->cur_download = 0;
   config->num_downloaded = 0;
-  config->num_chunks = num_chunks;
+  while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
+    hex2binary(hash_text, 40, hash);
+    add_receiver_list(config, (char *)hash, id);
+  }
 
   send_whohas(sock, config);
 }
@@ -197,12 +181,13 @@ void peer_packet_ops(int sock) {
 
 /** Congestion Control **/
 void peer_cc(bt_config_t *config) {
-  
+
   bt_sender_list *sender = config->upload;
   /* Iterate through connections */
   while (sender != NULL) {
     // if we have sent everything and been acked, cleanup
     if (sender->num_packets == sender->last_acked) {
+      DPRINTF(DEBUG_INIT, "Finished sending!\n");
       bt_sender_list *tmp = sender->next;
       del_sender_list(config, sender);
       sender = tmp;
@@ -213,6 +198,12 @@ void peer_cc(bt_config_t *config) {
     // timeout
 
     // queue up packets up to window size
+
+    int i;
+    for (i = sender->last_sent; i < sender->num_packets; i++) {
+      packet_new(sender->packets[i], &(sender->peer->addr));
+    }
+    sender->last_sent = sender->num_packets;
 
     sender = sender->next;
   }
@@ -244,11 +235,11 @@ void peer_run(bt_config_t *config) {
   }
 
   spiffy_init(config->identity, (struct sockaddr *)&myaddr, sizeof(myaddr));
-  
+
   packet_init();
   FD_ZERO(&writefds);
   FD_ZERO(&readfds);
-  
+
   while (1) {
     int nfds;
     FD_SET(STDIN_FILENO, &readfds);
@@ -264,7 +255,7 @@ void peer_run(bt_config_t *config) {
     }
 
     nfds = select(sock+1, &readfds, &writefds, NULL, NULL);
-  
+
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
         peer_packet_ops(sock);
