@@ -83,6 +83,7 @@ int send_ihave(int sock, struct sockaddr_in *to, chunk_list *chunks, bt_config_t
       return -1;
     }
     p.buf[0] = num_chunks;
+    p.buf[1] = p.buf[2] = p.buf[3] = 0;
     char *next_loc = p.buf + 4;
     int i;
     for (i = 0; i < num_chunks; i++) {
