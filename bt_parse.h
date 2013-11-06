@@ -105,6 +105,10 @@ void del_packet_list(bt_chunk_list *chunk);
 void add_receiver_list(bt_config_t *c, char *hash);
 void del_receiver_list(bt_config_t* c);
 void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packets, bt_peer_t *peer);
+void find_sender_list(bt_config_t *c, bt_peer_t *peer);
 void del_sender_list(bt_config_t *c, bt_sender_list *sender);
+
+int master_data_file(char *file, bt_config_t *config);
+int has_chunk(char *hash, bt_config_t *config);
 
 #endif /* _BT_PARSE_H_ */

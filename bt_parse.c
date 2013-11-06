@@ -340,6 +340,21 @@ void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packe
 }
 
 /**
+ * Finds a connection from the peer.
+ */
+bt_sender_list *find_sender_list(bt_config_t *c, bt_peer_t *peer) {
+  bt_sender_list *sender = c->upload;
+  while (sender != NULL) {
+    if (sender->peer != NULL) {
+      if (sender->peer->id == peer->id) return sender;
+    }
+    sender = sender->next;
+  }
+  return NULL;
+}
+
+
+/**
  * Deletes a connection from the sender_list.
  */
 void del_sender_list(bt_config_t *c, bt_sender_list *sender) {
@@ -361,4 +376,49 @@ void del_sender_list(bt_config_t *c, bt_sender_list *sender) {
   if (after != NULL) after->prev = before;
   
   free(sender);
+}
+
+
+
+int master_data_file(char *file, bt_config_t *config) {
+  FILE *chunk_file = fopen(config->chunk_file, "r");
+  if (has_chunk_file == NULL) {
+    fprintf(stderr, "Error opening master-chunk-file\n");
+    return 0;
+  }
+  
+  if (fscanf(has_chunk_file, "File: %s", file) < 0) {
+    return 0;
+  }
+  return 1;
+}
+
+/**
+ * Checks if this peer has a chunk for the given hash.
+ * 
+ * @param hash Chunk to check for
+ * @param config Config object
+ *
+ * @return The ID if this peer has the hash, -1 otherwise.
+ */
+int has_chunk(char *hash, bt_config_t *config) {
+  FILE *has_chunk_file = fopen(config->has_chunk_file, "r");
+  if (has_chunk_file == NULL) {
+    fprintf(stderr, "Error opening has-chunk-file\n");
+    return -1;
+  }
+
+  int id;
+  char buf[41];
+  while (1) {
+    if (fscanf(has_chunk_file, "%d %s", &id, buf) == EOF)
+      break;
+
+    uint8_t binary[20];
+    hex2binary(buf, 40, binary);
+
+    if (hash_equal(hash, (char *)binary))
+      return id;
+  }
+  return -1;
 }

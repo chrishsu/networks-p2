@@ -32,6 +32,24 @@ void del_chunk_list(chunk_list *list) {
   free(list);
 }
 
+
+/**
+ * Checks if two hashes are equal.
+ * Assumes both h1 and h2 have at least 20 bytes.
+ *  @param h1 First hash
+ * @param h2 Second hash
+ *
+ * @return 1 if h1 and h2 are the same hash, 0 otherwise.
+ */
+int hash_equal(char *h1, char *h2) {
+  int i;
+  for (i = 0; i < 20; i++) {
+    if (h1[i] != h2[i])
+      return 0;
+  }
+  return 1;
+}
+
 /**
  * Initializes the packet_head.
  *
