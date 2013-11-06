@@ -70,13 +70,13 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Read packet!\n");
   packet p;
   memcpy(&p.header, buf, sizeof(packet_head));
-  if (ntohsp.header.packet_len != bytes_read) {
-    fprintf("Packet has wrong packet_len!\n");
+  if (ntohs(p.header.packet_len) != bytes_read) {
+    fprintf(stderr, "Packet has wrong packet_len!\n");
     return;
   }
   if (ntohs(p.header.magic_num) != 15441 ||
       p.header.version != 1) {
-    fprintf("Packet has bad magic_num or version\n");
+    fprintf(stderr, "Packet has bad magic_num or version\n");
     return;
   }
 
@@ -121,7 +121,7 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   CFILE = fopen(chunkfile, "r");
   if (CFILE == NULL) {
     printf("No chunkfile!\n");
-    return -1;
+    return;
   }
   int id;
   char hash_text[41];
@@ -129,6 +129,7 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
 
   bt_chunk_list *chunks;
   bt_chunk_list *last;
+  int num_chunks = 0;
   while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
     hex2binary(hash_text, 40, hash);
     bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
@@ -144,10 +145,12 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
       chunks = chunk;
     last->next = chunk;
     last = chunk;
+    num_chunks++;
   }
   config->download = chunks;
   config->cur_download = 0;
   config->num_downloaded = 0;
+  config->num_chunks = num_chunks;
 
   send_whohas(sock, config);
 }
@@ -169,7 +172,7 @@ void handle_user_input(int sock, char *line, bt_config_t *config) {
   }
 }
 
-void peer_packet_ops() { 
+void peer_packet_ops(int sock) {
   packet_queue *pq = packet_pop();
   if (pq == NULL) return;
   DPRINTF(DEBUG_INIT, "Trying to send %d bytes...\t", (int)(pq->len));
@@ -192,22 +195,22 @@ void peer_packet_ops() {
 
 /** Congestion Control **/
 void peer_cc(bt_config_t *config) {
-  bt_sender_t *sender = config->upload;
+  bt_sender_list *sender = config->upload;
   /* Iterate through connections */
   while (sender != NULL) {
     // if we have sent everything and been acked, cleanup
     if (sender->num_packets == sender->last_acked) {
-      bt_sender_t *tmp = sender->next;
+      bt_sender_list *tmp = sender->next;
       del_sender_list(config, sender);
       sender = tmp;
       continue;
     }
-    
+
     // lost packet
     // timeout
-    
+
     // queue up packets up to window size
-    
+
     sender = sender->next;
   }
 }
@@ -243,11 +246,11 @@ void peer_run(bt_config_t *config) {
     int nfds;
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
-    
+
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-    
+
     if (!packet_empty()) {
       FD_SET(sock, &writefds);
     }
@@ -256,7 +259,7 @@ void peer_run(bt_config_t *config) {
 
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
-        peer_packet_ops();
+        peer_packet_ops(sock);
         FD_CLR(sock, &writefds);
       }
 
@@ -269,7 +272,7 @@ void peer_run(bt_config_t *config) {
         process_user_input(STDIN_FILENO, userbuf, handle_user_input, sock, config);
       }
     }
-    
+
     peer_cc(config);
   }
 }

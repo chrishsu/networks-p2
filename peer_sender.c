@@ -2,7 +2,7 @@
 
 /**
  * Processes a WHOHAS request.
- * 
+ *
  * @param sock Socket
  * @param from From address
  * @param p Packet recieved
@@ -42,7 +42,7 @@ int process_whohas(int sock, struct sockaddr_in *from, packet *p, bt_config_t *c
   toaddr.sin_port = from->sin_port;
   */
 
-  ret = send_ihave(sock, from, config, chunks);
+  ret = send_ihave(sock, from, chunks, config);
   DPRINTF(DEBUG_INIT, "Called send_ihave\n");
 
   //cleanup
@@ -54,7 +54,7 @@ int process_whohas(int sock, struct sockaddr_in *from, packet *p, bt_config_t *c
 /**
  * Sends an IHAVE packet to the given address.
  * Does nothing if chunks is empty.
- * 
+ *
  * @param sock Socket
  * @param toaddr To address
  * @param chunks list of chunks
@@ -102,7 +102,7 @@ int send_ihave(int sock, struct sockaddr_in *to, chunk_list *chunks, bt_config_t
 
 /**
  * Processes a GET request then sends a DATA packet.
- * 
+ *
  * @param sock Socket
  * @param from From address
  * @param p Packet recieved
@@ -114,23 +114,23 @@ int process_get(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
   char hash[20];
   int ret;
   DPRINTF(DEBUG_INIT, "Process GET\n");
-  
+
   // Only expecting 20 bytes
-  if (ntohs(p->header->packet_len) - ntohs(p->header->header_len) != 20) {
+  if (ntohs(p->header.packet_len) - ntohs(p->header.header_len) != 20) {
     return -1;
   }
-  
+
   memcpy(hash, p->buf, 20);
-  
+
   ret = send_data(sock, from, hash, config);
-  
+
   return ret;
 }
 
 
 /**
  * Sends DATA packet.
- * 
+ *
  * @param sock Socket
  * @param toaddr To address
  * @param hash Chunk hash of data to send
@@ -146,77 +146,77 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
   uint8_t filechunk[BT_CHUNK_SIZE];
   size_t read_bytes;
   DPRINTF(DEBUG_INIT, "Send DATA\n");
-  
+
   // Check if we actually have the chunk
   if ((id = has_chunk(hash, config)) < 0) {
     return -1;
   }
-  
-  if (!master_data_file(filename)) {
+
+  if (!master_data_file(filename, config)) {
     return -1;
   }
-  
-  FILE *master = fopen(filename, "rb"); 
+
+  FILE *master = fopen(filename, "rb");
   if (master == NULL) {
     fprintf(stderr, "Error opening master-data-file\n");
     return -1;
   }
-  
+
   if (fseek(master, id*BT_CHUNK_SIZE, SEEK_SET) != 0) {
     return -1;
   }
-  
+
   read_bytes = fread(filechunk, sizeof(uint8_t), BT_CHUNK_SIZE, master);
   if (read_bytes <= 0) return -1;
-  
+
   // Check the hash.
   uint8_t checkhash[20];
   shahash(filechunk, BT_CHUNK_SIZE, checkhash);
-  if (!hash_equal(hash, (char *) check_hash)) {
+  if (!hash_equal(hash, (char *) checkhash)) {
     return -1;
   }
-  
+
   int num_packets = (int)read_bytes/MAX_DATA_SIZE;
   if (num_packets * MAX_DATA_SIZE < (int)read_bytes) num_packets++;
-  
-  packet *packets[] = malloc(num_packets);
-  
+
+  packet **packets = (packet **)malloc(num_packets * sizeof(packet *));
+
   int i, chunk_bytes;
   // Sequence Numbers start at 1
   for (i = 1; i <= num_packets; i++) {
     int buf_len = (int)read_bytes - chunk_bytes;
     if (buf_len > MAX_DATA_SIZE) buf_len = MAX_DATA_SIZE;
-    
+
     // Add packets
     packet *p = malloc(sizeof(packet));
-    init_packet_head(&p.header, TYPE_DATA, 16, 16 + buf_len, i, 0);
+    init_packet_head(&(p->header), TYPE_DATA, 16, 16 + buf_len, i, 0);
     p->buf = malloc(buf_len);
-    memcpy(p->buf, filechunk[chunk_bytes], buf_len);
-    
+    memcpy(p->buf, filechunk + chunk_bytes, buf_len);
+
     packets[i] = p;
-    
+
     chunk_bytes += buf_len;
   }
-  
+
   if (chunk_bytes != (int)read_bytes) {
     fprintf(stderr, "Bytes to send and bytes read not equal!\n");
     return -1;
   }
-  
+
   // From sockaddr
   bt_peer_t *peer = peer_with_addr(to, config);
-  
+
   add_sender_list(config, hash, packets, num_packets, peer);
-  
+
   DPRINTF(DEBUG_INIT, "Added to %d packets for peer %d to sender list\n", num_packets, peer->id);
-  
+
   return 0;
 }
 
 /**
  * Processes ACK with connection_list.
  * Portion of congestion control (slow start & congestion avoidance) with increases in window_size.
- * 
+ *
  * @param sock Socket
  * @param from From address
  * @param p Packet recieved
@@ -231,24 +231,24 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
     fprintf(stderr, "Didn't find a peer!\n");
     return -1;
   }
-  
+
   // Find from peer
   bt_sender_list *sender = find_sender_list(config, peer);
   if (sender == NULL) {
     fprintf(stderr, "Didn't find a sender!!\n");
     return -1;
   }
-  
-  if (sender->last_acked == p->ack_num) {
+
+  if (sender->last_acked == ntohl(p->header.ack_num)) {
     sender->retransmit++;
   }
-  if (sender->last_acked < p->ack_num) {
-    sender->last_acked = p->ack_num;
+  if (sender->last_acked < ntohl(p->header.ack_num)) {
+    sender->last_acked = ntohl(p->header.ack_num);
   }
-  if (sender->last_acked > p->ack_num) {
+  if (sender->last_acked > ntohl(p->header.ack_num)) {
     // Probably not good.
-  }  
-  
+  }
+
   /* Slow Start */
   if (sender->state == 0) { //CC_START
     // Increase window size by 1
@@ -264,4 +264,5 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
       sender->recvd = 0;
     }
   }
+  return 0;
 }

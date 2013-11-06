@@ -2,6 +2,31 @@
 
 int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
   printf("Process IHAVE\n");
+
+  short datalen = ntohs(p->header.packet_len) - sizeof(packet_header);
+  char numchunks = p->buf[0];
+  datalen -= 4; // We already read the number of chunks
+  char *nextchunk = p->buf + 4;
+  char i;
+  char hash[20];
+  for (i = 0; i < numchunks; i++) {
+    if (datalen < 20) {
+      fprintf(stderr, "Peer packet too short!\n");
+      return -1;
+    }
+    memcpy(hash, nextchunk, 20);
+    bt_chunk_list *cur = config->download;
+    while (cur != NULL) {
+      if (hash_equal(hash, cur->hash)) {
+	//// Add to peer list ////
+	break;
+      }
+      cur = cur->next;
+    }
+
+    datalen -= 20;
+    nextchunk += 20;
+  }
   return 0;
 }
 

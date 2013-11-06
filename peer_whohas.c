@@ -102,7 +102,7 @@ char charVal(char h) {
 // @param chunkfile Chunk-file filename
 // @param config Config object
 // @return 0 on success, -1 on error
-int send_whohas(int sock, char *chunkfile, bt_config_t *config) {
+int send_whohas(int sock, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Send WHOHAS\n");
     FILE *file;
     packet p;

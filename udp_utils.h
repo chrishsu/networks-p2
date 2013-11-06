@@ -49,7 +49,7 @@ chunk_list *add_to_chunk_list(chunk_list *list, char *hash);
 int chunk_list_len(chunk_list *list);
 void del_chunk_list(chunk_list *list);
 
-hash_equal(char *h1, char *h2);
+int hash_equal(char *h1, char *h2);
 
 void init_packet_head(packet_head *h, char type,
                       short header_len, short packet_len,
