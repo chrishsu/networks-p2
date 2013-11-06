@@ -319,6 +319,7 @@ void del_receiver_list(bt_config_t* c) {
  * Adds a connection to the sender_list.
  */
 void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packets, bt_peer_t *peer) {
+  #define SSTHRESH_INIT 64
   assert(c != NULL);
   bt_sender_list *sender = malloc(sizeof(bt_sender_list));
   memcpy(sender->hash, hash, 20);
@@ -329,6 +330,8 @@ void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packe
   sender->last_acked = 0;
   sender->last_sent = 0;
   sender->window_size = 1;
+  sender->recvd = 0;
+  sender->ssthresh = SSTHRESH_INIT;
   sender->state = 0;
   sender->retransmit = 0;
   sender->peer = peer;

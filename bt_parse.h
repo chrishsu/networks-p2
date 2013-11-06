@@ -60,6 +60,8 @@ typedef struct bt_sender_list {
   int last_acked;
   int last_sent;
   int window_size;
+  int recvd;
+  int ssthresh;
   flag state; // start or avoid
   char retransmit;
   bt_peer_t *peer;
