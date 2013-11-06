@@ -36,14 +36,17 @@ typedef struct bt_peer_list {
 
 typedef struct bt_packet_list {
   int seq_num;
-  flag recv; 
+  flag recv;
   char *data;
+  size_t data_len;
   struct bt_packet_list *next;
 } bt_packet_list;
 
 typedef struct bt_chunk_list {
+  int id;
   char hash[20];
   int next_expected;
+  size_t total_data;
   bt_peer_t *peer;
   bt_peer_list *peers;
   bt_packet_list *packets;
@@ -73,13 +76,15 @@ struct bt_config_s {
   short identity;
   unsigned short myport;
 
-  int argc; 
+  int argc;
   char **argv;
 
   bt_peer_t *peers;
-  
+
   int cur_download;
   int cur_upload;
+  int num_chunks;
+  int num_downloaded;
   bt_chunk_list *download;
   bt_chunk_list *download_tail; // DO NOT ACCESS
   bt_sender_list *upload;
