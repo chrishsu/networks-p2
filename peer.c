@@ -96,7 +96,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     process_ihave(sock, &from, &p, config);
     break;
   case TYPE_GET:
-    process_get(sock, &from, &p, config);
+    //process_get(sock, &from, &p, config);
     break;
   case TYPE_DATA:
     process_data(sock, &from, &p, config);
@@ -127,12 +127,12 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   char hash_text[41];
   uint8_t hash[20];
 
-  bt_chunk_list *chunks;
-  bt_chunk_list *last;
+  //bt_chunk_list *chunks;
+  //bt_chunk_list *last;
   int num_chunks = 0;
   while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
     hex2binary(hash_text, 40, hash);
-    bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
+    /*bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
     memcpy(chunk->hash, hash, 20);
     chunk->id = id;
     chunk->next_expected = INIT_SEQNUM;
@@ -144,10 +144,11 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
     if (chunks == NULL)
       chunks = chunk;
     last->next = chunk;
-    last = chunk;
+    last = chunk;*/
+    add_receiver_list(config, (char *)hash, id);
     num_chunks++;
   }
-  config->download = chunks;
+  //config->download = chunks;
   config->cur_download = 0;
   config->num_downloaded = 0;
   config->num_chunks = num_chunks;
@@ -163,7 +164,7 @@ void handle_user_input(int sock, char *line, bt_config_t *config) {
 
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      printf("\n");
+      printf("\nReceived!\n");
       process_user_get(sock, chunkf, outf, config);
     }
     else {
@@ -179,6 +180,7 @@ void peer_packet_ops(int sock) {
 
   int bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr*)pq->dest_addr, sizeof(*(pq->dest_addr)));
   DPRINTF(DEBUG_INIT, "sent %d bytes\n", (int)bytes_sent);
+  printf("here %d!\n", (int)bytes_sent);
   if (bytes_sent < 0) {
     fprintf(stderr, "Error sending packet\n");
   } else {
@@ -195,6 +197,7 @@ void peer_packet_ops(int sock) {
 
 /** Congestion Control **/
 void peer_cc(bt_config_t *config) {
+  
   bt_sender_list *sender = config->upload;
   /* Iterate through connections */
   while (sender != NULL) {
@@ -241,22 +244,27 @@ void peer_run(bt_config_t *config) {
   }
 
   spiffy_init(config->identity, (struct sockaddr *)&myaddr, sizeof(myaddr));
-
+  
+  packet_init();
+  FD_ZERO(&writefds);
+  FD_ZERO(&readfds);
+  
   while (1) {
     int nfds;
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
 
+    /**
     struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;*/
 
     if (!packet_empty()) {
       FD_SET(sock, &writefds);
     }
 
-    nfds = select(sock+1, &readfds, &writefds, NULL, &timeout);
-
+    nfds = select(sock+1, &readfds, &writefds, NULL, NULL);
+  
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
         peer_packet_ops(sock);

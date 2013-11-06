@@ -104,7 +104,7 @@ void add_peer_list(bt_chunk_list *chunk, bt_peer_t *peer);
 void del_peer_list(bt_chunk_list *chunk);
 void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len);
 void del_packet_list(bt_chunk_list *chunk);
-void add_receiver_list(bt_config_t *c, char *hash);
+void add_receiver_list(bt_config_t *c, char *hash, int id);
 void del_receiver_list(bt_config_t* c);
 void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packets, bt_peer_t *peer);
 bt_sender_list *find_sender_list(bt_config_t *c, bt_peer_t *peer);

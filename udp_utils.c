@@ -70,7 +70,7 @@ void init_packet_head(packet_head *h, char type,
   h->header_len = htons(header_len);
   h->packet_len = htons(packet_len);
   h->seq_num = htonl(seq_num);
-  h->seq_num = htonl(seq_num);
+  h->ack_num = htonl(ack_num);
 }
 
 /*

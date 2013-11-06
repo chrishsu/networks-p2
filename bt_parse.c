@@ -280,11 +280,13 @@ void del_packet_list(bt_chunk_list *chunk) {
 /**
  * Keeps a chunk in order.
  */
-void add_receiver_list(bt_config_t *c, char *hash) {
+void add_receiver_list(bt_config_t *c, char *hash, int id) {
   assert(c != NULL);
   bt_chunk_list *chunk = malloc(sizeof(bt_chunk_list));
   memcpy(chunk->hash, hash, 20);
-  chunk->next_expected = 0;
+  chunk->id = id;
+  chunk->next_expected = 1;
+  chunk->total_data = 0;
   chunk->peer = NULL;
   chunk->peers = NULL;
   chunk->packets = NULL;

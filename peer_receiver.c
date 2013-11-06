@@ -7,7 +7,6 @@
 int send_whohas(int sock, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Send WHOHAS\n");
     packet p;
-    int lines = 0;
 
     /*file = fopen(config->chunk_file, "r");
     if (file == NULL) {
@@ -23,7 +22,7 @@ int send_whohas(int sock, bt_config_t *config) {
 
     //allocate space
     p.buf = malloc(4 + 20 * config->num_chunks);
-    p.buf[0] = lines & 0xFF; // Number of chunk hashes
+    p.buf[0] = config->num_chunks & 0xFF; // Number of chunk hashes
     p.buf[1] = p.buf[2] = p.buf[3] = 0;
     bt_chunk_list *cur = config->download;
 
@@ -46,16 +45,20 @@ int send_whohas(int sock, bt_config_t *config) {
       }*/
 
     //header setup
-    p.header.magic_num = htons(15441);
+    /*p.header.magic_num = htons(15441);
     p.header.version = 1;
     p.header.type = TYPE_WHOHAS;
     p.header.header_len = htons(16);
-    p.header.packet_len = htons(p.header.header_len + 4 + lines * 20);
+    p.header.packet_len = htons(16 + 4 + config->num_chunks * 20);
+    p.header.seq_num = 0;
+    p.header.ack_num = 0;*/
+    init_packet_head(&(p.header), TYPE_WHOHAS, 16,
+                     16 + 4 + config->num_chunks * 20, 0, 0);
 
     bt_peer_t *peer = config->peers;
     while (peer != NULL) {
       if (peer->id != config->identity)
-	packet_new(&p, &(peer->addr));
+        packet_new(&p, &(peer->addr));
       peer = peer->next;
     }
     DPRINTF(DEBUG_INIT, "Flooded peers with WHOHAS\n");
