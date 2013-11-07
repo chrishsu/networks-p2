@@ -4,7 +4,8 @@ void timeout_check(int sock, bt_config_t *config) {
   long long cur_time = time_millis();
   bt_peer_t *cur = config->peers;
   while (cur != NULL) {
-    if (cur_time - cur->last_response > TIMEOUT_MILLIS) {
+    if (cur->last_response != -1 &&
+	cur_time - cur->last_response > TIMEOUT_MILLIS) {
       cur->bad = 1;
       cur->downloading = 0;
       cur->chunk->peer = NULL;
