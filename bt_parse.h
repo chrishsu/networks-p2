@@ -60,14 +60,19 @@ typedef struct bt_sender_list {
   char hash[20];
   packet **packets;
   int num_packets;
+  
   int last_acked;
   int last_sent;
+  
   int window_size;
   int recvd;
   int ssthresh;
+  
   flag state; // start or avoid
-  char retransmit;
-  time_t sent_time;
+  char retransmit; // counter
+  time_t sent_time; // timeouts
+  // char dropped; // counter -- needed?
+  
   bt_peer_t *peer;
   struct bt_sender_list *prev;
   struct bt_sender_list *next;
