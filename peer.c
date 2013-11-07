@@ -194,7 +194,7 @@ void packet_sender(bt_sender_list *sender, int start) {
   if (send_up_to > sender->num_packets)
     send_up_to = sender->num_packets;
   // Start at sending the next packet
-  for (i = start + 1; i <= send_up_to; i++) {
+  for (i = start; i < send_up_to; i++) {
     if (sender->packets[i] == NULL) {
       DPRINTF(DEBUG_INIT, "sender->packets[%d] empty :(", i);
       return;
