@@ -159,16 +159,57 @@ void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) 
   // Well that's a lot shorter now! Thanks Chris! :)
   add_packet_list(chunk, seq_num, p->buf, data_len);
 
+  printf("Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
+  printf("Next expected: %d\n", chunk->next_expected);
+  
   if (chunk->total_data == BT_CHUNK_SIZE) {
     finish_chunk(sock, chunk, config);
-  } else {
-    printf("Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
-    printf("Next expected: %d\n", chunk->next_expected);
   }
+}
+
+int master_chunk(char *hash, bt_config_t *config) {
+  FILE *chunk_file = fopen(config->chunk_file, "r");
+  if (chunk_file == NULL) {
+    fprintf(stderr, "Error opening master-chunk-file\n");
+    return -1;
+  }
+
+  int id = -1;
+  char buf[41];
+  while (1) {
+    int ret = fscanf(chunk_file, "%d %s", &id, buf);
+    if (ret == EOF) break;
+    if (ret == 0) { //read to new line
+      while (fgetc(chunk_file) != '\n') { }
+      continue;
+    }
+
+    uint8_t binary[20];
+    hex2binary(buf, 40, binary);
+
+    if (hash_equal(hash, (char *)binary))
+      break;
+  }
+  fclose(chunk_file);
+  return id;
 }
 
 void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Finished chunk!!\n");
+
+  char buffer[BT_CHUNK_SIZE];
+  write_to_buffer(chunk->packets, buffer);
+  uint8_t computed_hash[20];
+  /*SHA1Context context;
+  SHA1Init(&context);
+  SHA1Update(&context, buffer, BT_CHUNK_SIZE);
+  SHA1Final(&context, computed_hash);*/
+  shahash((uint8_t *)buffer, BT_CHUNK_SIZE, computed_hash);
+  if (!hash_equal(chunk->hash, (char *)computed_hash)) {
+    DPRINTF(DEBUG_INIT, "Hash doesn't match!\n");
+    try_to_get(sock, chunk, config);
+    return;
+  }
 
   FILE *hcf = fopen(config->has_chunk_file, "a");
   if (!hcf) {
@@ -176,32 +217,21 @@ void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
     return;
   }
 
-  char buffer[BT_CHUNK_SIZE];
-  write_to_buffer(chunk->packets, buffer);
-  SHA1Context context;
-  uint8_t computed_hash[20];
-  SHA1Init(&context);
-  SHA1Update(&context, buffer, BT_CHUNK_SIZE);
-  SHA1Final(&context, computed_hash);
-  if (!memcmp(chunk->hash, computed_hash, 20)) {
-    DPRINTF(DEBUG_INIT, "Hash doesn't match!\n");
-    try_to_get(sock, chunk, config);
-    return;
-  }
-
   // Record that we have the chunk:
   uint8_t hash[20];
   char hash_text[41];
-  memcpy(chunk->hash, hash, 20);
+  memcpy(hash, chunk->hash, 20);
   binary2hex(hash, 20, hash_text);
-  fprintf(hcf, "%d %s\n", chunk->id, hash_text);
+  printf("getting chunk_id..\n");
+  int chunk_id = master_chunk(chunk->hash, config);
+  fprintf(hcf, "%d %s\n", chunk_id, hash_text);
   fclose(hcf);
 
   // We have another chunk now:
   config->num_downloaded++;
 
   // Reset configuration vars:
-  bt_peer_t *peer = chunk->peer;
+  //bt_peer_t *peer = chunk->peer;
   chunk->peer->downloading = 0;
   chunk->peer->chunk = NULL;
   chunk->peer = NULL;
@@ -211,15 +241,17 @@ void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
     finish_get(config);
   } else {
     // More to do...
-    bt_chunk_list *chunk = peer->chunk;
+    /*
+    bt_chunk_list *chunk = config->download;
     while (chunk != NULL) {
       // If it's not being downloaded...
       if (chunk->peer == NULL) {
-	// Does the necessary setup:
-	send_get(sock, &(peer->addr), chunk, config);
-	break;
+      	// Does the necessary setup:
+      	send_get(sock, &(peer->addr), chunk, config);
+      	break;
       }
-    }
+      chunk = chunk->next;
+    }*/
   }
 }
 
@@ -253,7 +285,7 @@ void finish_get(bt_config_t *config) {
  * Adds the data to the master chunk_list, sends an ACK as well.
  */
 int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
-  //DPRINTF(DEBUG_INIT, "process_data...\n");
+  DPRINTF(DEBUG_INIT, "process_data...\n");
   int seq_num = ntohl(p->header.seq_num);
   if (seq_num > MAX_SEQNUM || seq_num < INIT_SEQNUM) {
     fprintf(stderr, "Bad SEQNUM!\n");
@@ -261,8 +293,14 @@ int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *con
   }
 
   bt_peer_t *peer = peer_with_addr(from, config);
-  add_packet(sock, peer->chunk, p, config);
-  send_ack(sock, from, peer->chunk->next_expected - 1);
+  if (peer == NULL) {
+    fprintf(stderr, "Peer not found :(\n");
+    return -1;
+  }
+  bt_chunk_list *chunk = peer->chunk;
+  add_packet(sock, chunk, p, config);
+  printf("Next Expected: %d\n", chunk->next_expected);
+  send_ack(sock, from, chunk->next_expected - 1);
 
   return 0;
 }
@@ -292,8 +330,10 @@ void write_to_file(bt_packet_list *packets, FILE *outfile) {
  */
 void write_to_buffer(bt_packet_list *packets, char *buffer) {
   while (packets != NULL) {
+    //DPRINTF(DEBUG_INIT, "%d: %d\t", packets->seq_num, (int)packets->data_len);
     memcpy(buffer, packets->data, packets->data_len);
     buffer += packets->data_len;
     packets = packets->next;
   }
+  DPRINTF(DEBUG_INIT, "\n");
 }

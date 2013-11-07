@@ -238,6 +238,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
       if (cur->recv) return; // already got it!
       cur->recv = 1;
       cur->data = malloc(data_len);
+      cur->data_len = data_len;
       memcpy(cur->data, data, data_len);
       break;
     }
@@ -254,6 +255,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
       newp->recv = 1;
       newp->data = malloc(data_len);
       memcpy(newp->data, data, data_len);
+      newp->data_len = data_len;
     }
     else {
       newp->recv = 0;
@@ -412,8 +414,10 @@ int master_data_file(char *file, bt_config_t *config) {
   }
 
   if (fscanf(chunk_file, "File: %s", file) < 0) {
+    fclose(chunk_file);
     return 0;
   }
+  fclose(chunk_file);
   return 1;
 }
 
@@ -432,7 +436,7 @@ int has_chunk(char *hash, bt_config_t *config) {
     return -1;
   }
 
-  int id;
+  int id = -1;
   char buf[41];
   while (1) {
     if (fscanf(has_chunk_file, "%d %s", &id, buf) == EOF)
@@ -442,9 +446,10 @@ int has_chunk(char *hash, bt_config_t *config) {
     hex2binary(buf, 40, binary);
 
     if (hash_equal(hash, (char *)binary))
-      return id;
+      break;
   }
-  return -1;
+  fclose(has_chunk_file);
+  return id;
 }
 
 /**
