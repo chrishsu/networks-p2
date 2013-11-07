@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "debug.h"
 #include "spiffy.h"
 #include "bt_parse.h"
@@ -188,7 +189,7 @@ void packet_sender(bt_sender_list *sender, int start) {
     DPRINTF(DEBUG_INIT, "sender->packets empty :(\n");
     return;
   }
-  
+
   int i;
   int send_up_to = start + sender->window_size;
   if (send_up_to > sender->num_packets)
@@ -219,7 +220,7 @@ void peer_cc(bt_config_t *config) {
       sender = tmp;
       continue;
     }
-    
+
     int dropped = 0;
     // lost packet
     if (sender->retransmit >= 3) {
@@ -227,13 +228,13 @@ void peer_cc(bt_config_t *config) {
       dropped = 1;
       sender->retransmit = 0;
     }
-    
+
     // timeout
-    if (difftime(time(), sender->sent_time) > CC_TIMEOUT && sender->sent_time != 0) {
+    if (difftime(time(NULL), sender->sent_time) > CC_TIMEOUT && sender->sent_time != 0) {
       packet_sender(sender, sender->last_acked);
       dropped = 1;
     }
-    
+
     // update window size
     if (dropped) {
       if (sender->state == 0) sender->state = 1;
@@ -244,7 +245,7 @@ void peer_cc(bt_config_t *config) {
 
     // queue up packets up to window size
     packet_sender(sender, sender->last_sent);
-    
+
     sender = sender->next;
   }
 }
@@ -294,7 +295,7 @@ void peer_run(bt_config_t *config) {
     }
 
     nfds = select(sock+1, &readfds, &writefds, NULL, &waittime);
-    
+
     timeout_check(sock, config);
 
     if (nfds > 0) {
