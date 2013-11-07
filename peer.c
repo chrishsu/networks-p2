@@ -189,6 +189,7 @@ void peer_packet_ops(int sock) {
  * @param start Sequence number to start at
  */
 void packet_sender(bt_sender_list *sender, int start) {
+  printf("packet_sender: %d\n", start);
   if (sender->packets == NULL) {
     DPRINTF(DEBUG_INIT, "sender->packets empty :(\n");
     return;
@@ -205,6 +206,7 @@ void packet_sender(bt_sender_list *sender, int start) {
       DPRINTF(DEBUG_INIT, "sender->packets[%d] empty :(", i);
       return;
     }
+    printf("\tAdding #%d\n", ntohl(sender->packets[i]->header.seq_num));
     packet_new(sender->packets[i], &(sender->peer->addr));
   }
   sender->last_sent = send_up_to;

@@ -162,6 +162,7 @@ void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) 
     finish_chunk(sock, chunk, config);
   } else {
     printf("Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
+    printf("Next expected: %d\n", chunk->next_expected);
   }
 }
 
