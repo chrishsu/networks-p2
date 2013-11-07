@@ -46,4 +46,4 @@ test_input_buffer:  test_input_buffer.o input_buffer.o
 
 test_queue: test_queue.o queue.o
 
-test_bt_parse: test_bt_parse.o bt_parse.o debug.o
+test_bt_parse: test_bt_parse.o bt_parse.o chunk.o udp_utils.o sha.o debug.o

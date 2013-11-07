@@ -144,6 +144,7 @@ int send_get(int sock, struct sockaddr_in *to, bt_chunk_list *chunk, bt_config_t
   memcpy(p.buf, chunk->hash, 20);
   packet_new(&p, to);
   DPRINTF(DEBUG_INIT, "Sent GET sucessfully!\n");
+  free(p.buf);
   return 0;
 }
 
@@ -261,7 +262,7 @@ int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *con
 
   bt_peer_t *peer = peer_with_addr(from, config);
   add_packet(sock, peer->chunk, p, config);
-  send_ack(sock, from, peer->chunk->next_expected);
+  send_ack(sock, from, peer->chunk->next_expected - 1);
 
   return 0;
 }

@@ -96,6 +96,8 @@ int send_ihave(int sock, struct sockaddr_in *to, chunk_list *chunks, bt_config_t
     total_chunks -= num_chunks;
 
     DPRINTF(DEBUG_INIT, "Added IHAVE to queue with %d chunks\n", num_chunks);
+    
+    free(p.buf);
   }
   return 0;
 }
@@ -173,12 +175,18 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     fprintf(stderr, "Read nonpositive number of bytes!\n");
     return -1;
   }
-  DPRINTF(DEBUG_INIT, "Read %d bytes\n", (int)read_bytes);
+  DPRINTF(DEBUG_INIT, "Read %d bytes from hash #%d\n", (int)read_bytes, id);
 
   // Check the hash.
   uint8_t checkhash[20];
   shahash(filechunk, BT_CHUNK_SIZE, checkhash);
   if (!hash_equal(hash, (char *) checkhash)) {
+    char dahash1[41];
+    char dahash2[41];
+    binary2hex((uint8_t *)hash, 20, dahash1);
+    binary2hex(checkhash, 20, dahash2);
+    fprintf(stderr, "%s != %s\n", dahash1, dahash2);
+    fprintf(stderr, "Chunks not equal!\n");
     return -1;
   }
 
@@ -187,7 +195,7 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
 
   packet **packets = (packet **)malloc(num_packets  * sizeof(packet *));
 
-  int i, chunk_bytes;
+  int i, chunk_bytes; chunk_bytes = 0;
   // Sequence Numbers start at 1
   for (i = 1; i <= num_packets; i++) {
     int buf_len = (int)read_bytes - chunk_bytes;
@@ -202,8 +210,11 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     packets[i - 1] = p;
 
     chunk_bytes += buf_len;
+    //printf("%d: %d|%d\t", i, chunk_bytes, buf_len);
   }
-
+  
+  DPRINTF(DEBUG_INIT, "packets: %d\t bytes: %d\n", num_packets, (int)chunk_bytes);
+  
   if (chunk_bytes != (int)read_bytes) {
     fprintf(stderr, "Bytes to send and bytes read not equal!\n");
     return -1;

@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "bt_parse.h"
+#include "udp_utils.h"
+#include "chunk.h"
 #include "debug.h"
 #include "peer_receiver.h"
 
@@ -210,10 +212,11 @@ void del_peer_list(bt_chunk_list *chunk) {
  * If received out of order, initializes empty list nodes.
  */
 void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len) {
-  int last_seq;
+  int last_seq = 0;
   bt_packet_list *prev = NULL;
   bt_packet_list *cur = chunk->packets;
 
+  /*
   if (cur == NULL) {
     //printf("initialize packet list\n");
     bt_packet_list *newp = malloc(sizeof(bt_packet_list));
@@ -224,7 +227,7 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
     newp->next = NULL;
     chunk->packets = newp;
     return;
-  }
+  }*/
 
    // Check if node already exists.
   //printf("searching packet list\n");
@@ -232,23 +235,22 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
     //printf("seqnum: %d\n", cur->seq_num);
     last_seq = cur->seq_num;
     if (last_seq == seq_num) {
+      if (cur->recv) return; // already got it!
       cur->recv = 1;
       cur->data = malloc(data_len);
       memcpy(cur->data, data, data_len);
-      return;
+      break;
     }
     prev = cur;
     cur = cur->next;
   }
 
   // Create new nodes.
-  //printf("adding new packet list\n");
   int i;
   for (i = last_seq + 1; i <= seq_num; i++) {
     bt_packet_list *newp = malloc(sizeof(bt_packet_list));
     newp->seq_num = i;
     if (i == seq_num) {
-      //printf("added!\n");
       newp->recv = 1;
       newp->data = malloc(data_len);
       memcpy(newp->data, data, data_len);
@@ -257,9 +259,14 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
       newp->recv = 0;
       newp->data = NULL;
     }
+    
     newp->next = NULL;
-    //printf("prev: %d\n", prev->seq_num);
-    prev->next = newp;
+    
+    if (chunk->packets == NULL) {
+      chunk->packets = newp;
+    }
+    else prev->next = newp;
+    
     prev = newp;
   }
   chunk->total_data += data_len;

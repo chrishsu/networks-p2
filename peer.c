@@ -118,6 +118,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     // Not yet implemented
     break;
   }
+  free(p.buf);
 }
 
 void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *config) {
@@ -196,12 +197,12 @@ void packet_sender(bt_sender_list *sender, int start) {
   }
 
   int i;
-  int send_up_to = start + sender->window_size;
+  int send_up_to = start + sender->window_size - 1;
   if (send_up_to > sender->num_packets)
     send_up_to = sender->num_packets;
   // Start at sending the next packet
   // Sequence numbers go from start to send_up_to - 1
-  for (i = start - 1; i < send_up_to - 1; i++) {
+  for (i = start - 1; i < send_up_to; i++) {
     if (sender->packets[i] == NULL) {
       DPRINTF(DEBUG_INIT, "sender->packets[%d] empty :(", i);
       return;
@@ -209,8 +210,8 @@ void packet_sender(bt_sender_list *sender, int start) {
     printf("\tAdding #%d\n", ntohl(sender->packets[i]->header.seq_num));
     packet_new(sender->packets[i], &(sender->peer->addr));
   }
-  sender->last_sent = send_up_to;
   sender->sent_time = time(NULL);
+  sender->last_sent = send_up_to;
 }
 
 /** Congestion Control **/
@@ -220,7 +221,7 @@ void peer_cc(bt_config_t *config) {
   /* Iterate through connections */
   while (sender != NULL) {
     // if we have sent everything and been acked, cleanup
-    if (sender->num_packets + 1 == sender->last_acked) {
+    if (sender->num_packets == sender->last_acked) {
       DPRINTF(DEBUG_INIT, "Finished sending!\n");
       bt_sender_list *tmp = sender->next;
       del_sender_list(config, sender);
@@ -231,15 +232,14 @@ void peer_cc(bt_config_t *config) {
     int dropped = 0;
     // lost packet
     if (sender->retransmit >= 3) {
-      printf("Retransmitting %d\n", sender->last_acked);
-      packet_sender(sender, sender->last_acked);
+      DPRINTF(DEBUG_INIT, "Retransmitting %d\n", sender->last_acked);
       dropped = 1;
       sender->retransmit = 0;
     }
 
     // timeout
     if (difftime(time(NULL), sender->sent_time) > CC_TIMEOUT && sender->sent_time != 0) {
-      packet_sender(sender, sender->last_acked);
+      DPRINTF(DEBUG_INIT, "Timeout on %d\n", sender->last_acked);
       dropped = 1;
     }
 
@@ -249,11 +249,14 @@ void peer_cc(bt_config_t *config) {
       sender->ssthresh = sender->window_size/2;
       if (sender->ssthresh < 2) sender->ssthresh = 2;
       sender->window_size = 1;
+      packet_sender(sender, sender->last_acked);
       continue;
     }
 
     // queue up packets up to window size
-    packet_sender(sender, sender->last_sent + 1);
+    if (sender->last_acked == sender->last_sent) {
+      packet_sender(sender, sender->last_acked + 1);
+    }
 
     sender = sender->next;
   }

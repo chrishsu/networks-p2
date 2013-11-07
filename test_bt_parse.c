@@ -1,6 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include "chunk.h"
 #include "bt_parse.h"
+
+void packet_list(bt_chunk_list *d, int seq) {
+  add_packet_list(d, seq, "hi", 2);
+  printf("Adding Packet: %d\n", seq);
+  printf("Next Expected: %d\n", d->next_expected);
+  printf("Total Data: %d\n", (int)d->total_data);
+}
 
 int main() {
   bt_config_t config;
@@ -19,26 +27,28 @@ int main() {
   peer3.next = NULL;
   
   /** Chunk List **/
-  add_receiver_list(&config, "1");
+  printf("-------CHUNK LIST-------\n");
+  add_receiver_list(&config, "1", 1);
   printf("Added Chunk: 1\n");
-  add_receiver_list(&config, "2");
+  add_receiver_list(&config, "2", 2);
   printf("Added Chunk: 2\n");
-  add_receiver_list(&config, "3");
+  add_receiver_list(&config, "3", 3);
   printf("Added Chunk: 3\n");
-  add_receiver_list(&config, "4");
+  add_receiver_list(&config, "4", 4);
   printf("Added Chunk: 4\n");
-  add_receiver_list(&config, "5");
+  add_receiver_list(&config, "5", 5);
   printf("Added Chunk: 5\n");
   bt_chunk_list *cl = config.download;
   while(cl != NULL) {
-    printf("Chunk: %s\n", cl->hash);
+    printf("Chunk: %d\n", cl->id);
     cl = cl->next;
   }
   del_receiver_list(&config);
   printf("Del Chunk list\n");
   
   /** Peer List **/
-  add_receiver_list(&config, "A");
+  printf("\n-------PEER LIST-------\n");
+  add_receiver_list(&config, "A", 0);
   printf("Added Chunk: A\n");
   add_peer_list(config.download, &peer1);
   printf("Added Peer: peer1\n");
@@ -53,12 +63,14 @@ int main() {
   }
   
   /** Packet List **/
-  add_packet_list(config.download, 1, "hi", 2);
-  printf("Added Packet: 1\n");
-  add_packet_list(config.download, 2, "hi", 2);
-  printf("Added Packet: 2\n");
-  add_packet_list(config.download, 3, "hi", 2);
-  printf("Added Packet: 3\n");
+  printf("\n-------PACKET LIST-------\n");
+  packet_list(config.download, 1);
+  packet_list(config.download, 2);
+  packet_list(config.download, 4);
+  packet_list(config.download, 5);
+  packet_list(config.download, 2);
+  packet_list(config.download, 4);
+  packet_list(config.download, 3);
   bt_packet_list *kl = config.download->packets;
   while(kl != NULL) {
     printf("Packet: %d\n", kl->seq_num);
@@ -69,6 +81,7 @@ int main() {
   printf("Del Chunk list\n");
   
   /** Sender List **/
+  printf("\n-------SENDER LIST-------\n");
   add_sender_list(&config, "1", NULL, 0, &peer1);
   printf("Added Connection: 1\n");
   add_sender_list(&config, "2", NULL, 0, &peer2);
@@ -83,6 +96,7 @@ int main() {
   }
   
   /** Delete front of list **/
+  printf("\n---Delete front of list\n");
   sl = config.upload;
   printf("Del %d\n", sl->peer->id);
   del_sender_list(&config, sl);
@@ -103,6 +117,7 @@ int main() {
   }
   
   /** Delete middle of list **/
+  printf("\n---Delete middle of list\n");
   sl = config.upload->next;
   printf("Del %d\n", sl->peer->id);
   del_sender_list(&config, sl);
@@ -123,6 +138,7 @@ int main() {
   }
   
   /** Delete end of list **/
+  printf("\n---Delete end of list\n");
   sl = config.upload->next->next;
   printf("Del %d\n", sl->peer->id);
   del_sender_list(&config, sl);
