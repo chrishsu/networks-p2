@@ -1,4 +1,5 @@
 #include "peer_receiver.h"
+#include "sha.h"
 
 void timeout_check(int sock, bt_config_t *config) {
   long long cur_time = time_millis();
@@ -162,11 +163,28 @@ void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) 
 }
 
 void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
+  DPRINTF(DEBUG_INIT, "Finished chunk!!\n");
+
   FILE *hcf = fopen(config->has_chunk_file, "a");
   if (!hcf) {
     fprintf(stderr, "Error opening has-chunk-file to append!\n");
     return;
   }
+
+  char buffer[BT_CHUNK_SIZE];
+  write_to_buffer(chunk->packets, buffer);
+  SHA1Context context;
+  uint8_t computed_hash[20];
+  SHA1Init(&context);
+  SHA1Update(&context, buffer, BT_CHUNK_SIZE);
+  SHA1Final(&context, computed_hash);
+  if (!memcmp(chunk->hash, computed_hash, 20)) {
+    DPRINTF(DEBUG_INIT, "Hash doesn't match!\n");
+    try_to_get(sock, chunk, config);
+    return;
+  }
+
+  // Record that we have the chunk:
   uint8_t hash[20];
   char hash_text[41];
   memcpy(chunk->hash, hash, 20);
@@ -174,8 +192,10 @@ void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   fprintf(hcf, "%d %s\n", chunk->id, hash_text);
   fclose(hcf);
 
+  // We have another chunk now:
   config->num_downloaded++;
 
+  // Reset configuration vars:
   bt_peer_t *peer = chunk->peer;
   chunk->peer->downloading = 0;
   chunk->peer->chunk = NULL;
@@ -258,6 +278,17 @@ int send_ack(int sock, struct sockaddr_in *to, int ack_num) {
 void write_to_file(bt_packet_list *packets, FILE *outfile) {
   while (packets != NULL) {
     fwrite(packets->data, sizeof(char), packets->data_len, outfile);
+    packets = packets->next;
+  }
+}
+
+/**
+ * Writes the data in the packets in the given list to the given buffer
+ */
+void write_to_buffer(bt_packet_list *packets, char *buffer) {
+  while (packets != NULL) {
+    memcpy(buffer, packets->data, packets->data_len);
+    buffer += packets->data_len;
     packets = packets->next;
   }
 }
