@@ -1,4 +1,4 @@
-ud/*
+/*
  * peer.c
  *
  * Authors: Ed Bardsley <ebardsle+441@andrew.cmu.edu>,
@@ -50,6 +50,7 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  reset_peers(&config);
   peer_run(&config);
   return 0;
 }
