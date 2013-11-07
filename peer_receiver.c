@@ -158,8 +158,11 @@ void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) 
   // Well that's a lot shorter now! Thanks Chris! :)
   add_packet_list(chunk, seq_num, p->buf, data_len);
 
-  if (chunk->total_data == BT_CHUNK_SIZE)
+  if (chunk->total_data == BT_CHUNK_SIZE) {
     finish_chunk(sock, chunk, config);
+  } else {
+    printf("Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
+  }
 }
 
 void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
@@ -248,7 +251,7 @@ void finish_get(bt_config_t *config) {
  * Adds the data to the master chunk_list, sends an ACK as well.
  */
 int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
-  DPRINTF(DEBUG_INIT, "process_data...\n");
+  //DPRINTF(DEBUG_INIT, "process_data...\n");
   int seq_num = ntohl(p->header.seq_num);
   if (seq_num > MAX_SEQNUM || seq_num < INIT_SEQNUM) {
     fprintf(stderr, "Bad SEQNUM!\n");

@@ -169,7 +169,7 @@ void peer_packet_ops(int sock) {
 
   int bytes_sent = spiffy_sendto(sock, pq->buf, pq->len, 0, (struct sockaddr*)pq->dest_addr, sizeof(*(pq->dest_addr)));
   DPRINTF(DEBUG_INIT, "sent %d bytes\n", (int)bytes_sent);
-  printf("here %d!\n", (int)bytes_sent);
+  //printf("here %d!\n", (int)bytes_sent);
   if (bytes_sent < 0) {
     fprintf(stderr, "Error sending packet\n");
   } else {
@@ -184,6 +184,10 @@ void peer_packet_ops(int sock) {
   }
 }
 
+/**
+ * @param sender Sender
+ * @param start Sequence number to start at
+ */
 void packet_sender(bt_sender_list *sender, int start) {
   if (sender->packets == NULL) {
     DPRINTF(DEBUG_INIT, "sender->packets empty :(\n");
@@ -195,7 +199,8 @@ void packet_sender(bt_sender_list *sender, int start) {
   if (send_up_to > sender->num_packets)
     send_up_to = sender->num_packets;
   // Start at sending the next packet
-  for (i = start; i < send_up_to; i++) {
+  // Sequence numbers go from start to send_up_to - 1
+  for (i = start - 1; i < send_up_to - 1; i++) {
     if (sender->packets[i] == NULL) {
       DPRINTF(DEBUG_INIT, "sender->packets[%d] empty :(", i);
       return;
@@ -213,7 +218,7 @@ void peer_cc(bt_config_t *config) {
   /* Iterate through connections */
   while (sender != NULL) {
     // if we have sent everything and been acked, cleanup
-    if (sender->num_packets == sender->last_acked) {
+    if (sender->num_packets + 1 == sender->last_acked) {
       DPRINTF(DEBUG_INIT, "Finished sending!\n");
       bt_sender_list *tmp = sender->next;
       del_sender_list(config, sender);
@@ -224,6 +229,7 @@ void peer_cc(bt_config_t *config) {
     int dropped = 0;
     // lost packet
     if (sender->retransmit >= 3) {
+      printf("Retransmitting %d\n", sender->last_acked);
       packet_sender(sender, sender->last_acked);
       dropped = 1;
       sender->retransmit = 0;
@@ -244,7 +250,7 @@ void peer_cc(bt_config_t *config) {
     }
 
     // queue up packets up to window size
-    packet_sender(sender, sender->last_sent);
+    packet_sender(sender, sender->last_sent + 1);
 
     sender = sender->next;
   }
