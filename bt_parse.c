@@ -350,6 +350,7 @@ void add_sender_list(bt_config_t *c, char *hash, packet **packets, int num_packe
   sender->state = 0;
   sender->retransmit = 0;
   sender->peer = peer;
+  sender->sent_time = 0;
 
   sender->prev = NULL;
   sender->next = c->upload;

@@ -67,6 +67,7 @@ typedef struct bt_sender_list {
   int ssthresh;
   flag state; // start or avoid
   char retransmit;
+  time_t sent_time;
   bt_peer_t *peer;
   struct bt_sender_list *prev;
   struct bt_sender_list *next;

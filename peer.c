@@ -1,4 +1,4 @@
-ud/*
+/*
  * peer.c
  *
  * Authors: Ed Bardsley <ebardsle+441@andrew.cmu.edu>,
@@ -26,6 +26,7 @@ ud/*
 #include "peer_sender.h"
 
 #define WAIT_MILLIS 100
+#define CC_TIMEOUT 5.0 //5 seconds
 
 void peer_run(bt_config_t *config);
 
@@ -181,6 +182,28 @@ void peer_packet_ops(int sock) {
   }
 }
 
+void packet_sender(bt_sender_list *sender, int start) {
+  if (sender->packets == NULL) {
+    DPRINTF(DEBUG_INIT, "sender->packets empty :(\n");
+    return;
+  }
+  
+  int i;
+  int send_up_to = start + sender->window_size;
+  if (send_up_to > sender->num_packets)
+    send_up_to = sender->num_packets;
+  // Start at sending the next packet
+  for (i = start + 1; i <= send_up_to; i++) {
+    if (sender->packets[i] == NULL) {
+      DPRINTF(DEBUG_INIT, "sender->packets[%d] empty :(", i);
+      return;
+    }
+    packet_new(sender->packets[i], &(sender->peer->addr));
+  }
+  sender->last_sent = send_up_to;
+  sender->sent_time = time(NULL);
+}
+
 /** Congestion Control **/
 void peer_cc(bt_config_t *config) {
 
@@ -195,18 +218,32 @@ void peer_cc(bt_config_t *config) {
       sender = tmp;
       continue;
     }
-
+    
+    int dropped = 0;
     // lost packet
+    if (sender->retransmit >= 3) {
+      packet_sender(sender, sender->last_acked);
+      dropped = 1;
+      sender->retransmit = 0;
+    }
+    
     // timeout
+    if (difftime(time(), sender->sent_time) > CC_TIMEOUT && sender->sent_time != 0) {
+      packet_sender(sender, sender->last_acked);
+      dropped = 1;
+    }
+    
+    // update window size
+    if (dropped) {
+      if (sender->state == 0) sender->state = 1;
+      sender->window_size = sender->window_size/2;
+      if (sender->window_size < 2) sender->window_size = 2;
+      continue;
+    }
 
     // queue up packets up to window size
-
-    int i;
-    for (i = sender->last_sent; i < sender->num_packets; i++) {
-      packet_new(sender->packets[i], &(sender->peer->addr));
-    }
-    sender->last_sent = sender->num_packets;
-
+    packet_sender(sender, sender->last_sent);
+    
     sender = sender->next;
   }
 }
@@ -247,10 +284,6 @@ void peer_run(bt_config_t *config) {
     FD_SET(STDIN_FILENO, &readfds);
     FD_SET(sock, &readfds);
 
-    /**
-    struct timeval timeout;
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;*/
     struct timeval waittime;
     waittime.tv_sec = 0;
     waittime.tv_usec = WAIT_MILLIS * 1000;
@@ -260,6 +293,7 @@ void peer_run(bt_config_t *config) {
     }
 
     nfds = select(sock+1, &readfds, &writefds, NULL, &waittime);
+    
     timeout_check(sock, config);
 
     if (nfds > 0) {
