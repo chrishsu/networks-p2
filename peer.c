@@ -1,4 +1,4 @@
-/*
+ud/*
  * peer.c
  *
  * Authors: Ed Bardsley <ebardsle+441@andrew.cmu.edu>,
@@ -24,6 +24,8 @@
 #include "queue.h"
 #include "peer_receiver.h"
 #include "peer_sender.h"
+
+#define WAIT_MILLIS 100
 
 void peer_run(bt_config_t *config);
 
@@ -249,12 +251,16 @@ void peer_run(bt_config_t *config) {
     struct timeval timeout;
     timeout.tv_sec = 10;
     timeout.tv_usec = 0;*/
+    struct timeval waittime;
+    waittime.tv_sec = 0;
+    waittime.tv_usec = WAIT_MILLIS * 1000;
 
     if (!packet_empty()) {
       FD_SET(sock, &writefds);
     }
 
-    nfds = select(sock+1, &readfds, &writefds, NULL, NULL);
+    nfds = select(sock+1, &readfds, &writefds, NULL, &waittime);
+    timeout_check(sock, config);
 
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
