@@ -258,15 +258,14 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
   /* Slow Start */
   if (sender->state == 0) { //CC_START
     // Increase window size by 1
-    if (sender->window_size < sender->ssthresh)
-      sender->window_size++;
+    sender->window_size++;
+    if (sender->window_size > sender->ssthresh) sender->state = 1;
   }
   /* Congestion Avoidance */
   else {
     sender->recvd++;
     if (sender->recvd == sender->window_size) {
-      if (sender->window_size < sender->ssthresh)
-        sender->window_size++;
+      sender->window_size++;
       sender->recvd = 0;
     }
   }

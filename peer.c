@@ -243,9 +243,10 @@ void peer_cc(bt_config_t *config) {
 
     // update window size
     if (dropped) {
-      if (sender->state == 0) sender->state = 1;
-      sender->window_size = sender->window_size/2;
-      if (sender->window_size < 2) sender->window_size = 2;
+      if (sender->state == 1) sender->state = 0;
+      sender->ssthresh = sender->window_size/2;
+      if (sender->ssthresh < 2) sender->ssthresh = 2;
+      sender->window_size = 1;
       continue;
     }
 
