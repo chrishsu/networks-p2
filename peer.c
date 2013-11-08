@@ -309,6 +309,7 @@ void peer_run(bt_config_t *config) {
     nfds = select(sock+1, &readfds, &writefds, NULL, &waittime);
 
     timeout_check(sock, config);
+    get_all_the_thingz(sock, config);
 
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {

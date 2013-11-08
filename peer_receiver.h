@@ -57,5 +57,6 @@ void finish_get(bt_config_t *config);
 int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config);
 void write_to_file(bt_packet_list *packets, FILE *outfile);
 void write_to_buffer(bt_packet_list *packets, char *buffer);
+void get_all_the_thingz(int sock, bt_config_t *config);
 
 #endif

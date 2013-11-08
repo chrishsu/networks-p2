@@ -96,7 +96,7 @@ int send_ihave(int sock, struct sockaddr_in *to, chunk_list *chunks, bt_config_t
     total_chunks -= num_chunks;
 
     DPRINTF(DEBUG_INIT, "Added IHAVE to queue with %d chunks\n", num_chunks);
-    
+
     free(p.buf);
   }
   return 0;
@@ -153,10 +153,12 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
 
   // Check if we actually have the chunk
   if ((id = has_chunk(hash, config)) < 0) {
+    fprintf(stderr, "We don't have the chunk!\n");
     return -1;
   }
 
   if (!master_data_file(filename, config)) {
+    fprintf(stderr, "Error getting master data file!\n");
     return -1;
   }
 
@@ -165,8 +167,11 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     fprintf(stderr, "Error opening master-data-file '%s'\n", filename);
     return -1;
   }
+  else
+    printf("Opened MDF: '%s'\n", filename);
 
   if (fseek(master, id*BT_CHUNK_SIZE, SEEK_SET) != 0) {
+    fprintf(stderr, "Error in fseek!\n");
     return -1;
   }
 
@@ -212,9 +217,9 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     chunk_bytes += buf_len;
     //printf("%d: %d|%d\t", i, chunk_bytes, buf_len);
   }
-  
+
   DPRINTF(DEBUG_INIT, "packets: %d\t bytes: %d\n", num_packets, (int)chunk_bytes);
-  
+
   if (chunk_bytes != (int)read_bytes) {
     fprintf(stderr, "Bytes to send and bytes read not equal!\n");
     return -1;

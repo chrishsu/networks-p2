@@ -161,7 +161,9 @@ void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) 
 
   printf("Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
   printf("Next expected: %d\n", chunk->next_expected);
-  
+
+  // Put this into process_data because
+  // we want to send the ack before doing this:
   if (chunk->total_data == BT_CHUNK_SIZE) {
     finish_chunk(sock, chunk, config);
   }
@@ -197,6 +199,11 @@ int master_chunk(char *hash, bt_config_t *config) {
 void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Finished chunk!!\n");
 
+  chunk->peer->downloading = 0;
+  chunk->peer->chunk = NULL;
+  chunk->peer = NULL;
+  config->cur_download--;
+
   char buffer[BT_CHUNK_SIZE];
   write_to_buffer(chunk->packets, buffer);
   uint8_t computed_hash[20];
@@ -222,36 +229,60 @@ void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   char hash_text[41];
   memcpy(hash, chunk->hash, 20);
   binary2hex(hash, 20, hash_text);
-  printf("getting chunk_id..\n");
+  printf("getting chunk_id...\n");
   int chunk_id = master_chunk(chunk->hash, config);
   fprintf(hcf, "%d %s\n", chunk_id, hash_text);
   fclose(hcf);
+  printf("Recorded getting chunk with id %d\n", chunk_id);
 
   // We have another chunk now:
   config->num_downloaded++;
+  chunk->downloaded = 1;
 
   // Reset configuration vars:
   //bt_peer_t *peer = chunk->peer;
+  /*
   chunk->peer->downloading = 0;
   chunk->peer->chunk = NULL;
   chunk->peer = NULL;
+  */
 
   if (config->num_downloaded == config->num_chunks) {
     // DONE!!! :)
     finish_get(config);
   } else {
-    // More to do...
     /*
-    bt_chunk_list *chunk = config->download;
-    while (chunk != NULL) {
+    // More to do...
+    bt_chunk_list *cur = config->download;
+    while (cur != NULL) {
       // If it's not being downloaded...
-      if (chunk->peer == NULL) {
+      if (!cur->downloaded && cur->peer == NULL) {
       	// Does the necessary setup:
-      	send_get(sock, &(peer->addr), chunk, config);
+      	send_get(sock, &(peer->addr), cur, config);
       	break;
       }
-      chunk = chunk->next;
-    }*/
+      cur = cur->next;
+    }
+    */
+  }
+}
+
+void get_all_the_thingz(int sock, bt_config_t *config) {
+  bt_chunk_list *chunk = config->download;
+  // Technically don't need to check max_conn, since send_get
+  // does nothing if you're full, but it's faster this way:
+  while (chunk != NULL && config->cur_download < config->max_conn) {
+    if (!chunk->downloaded && chunk->peer == NULL) {
+      bt_peer_list *peer_list = chunk->peers;
+      while (peer_list != NULL) {
+	if (peer_list->peer->downloading || peer_list->peer->bad)
+	  continue;
+	send_get(sock, &(peer_list->peer->addr), chunk, config);
+	break;
+	peer_list = peer_list->next;
+      }
+    }
+    chunk = chunk->next;
   }
 }
 

@@ -49,6 +49,7 @@ typedef struct bt_chunk_list {
   int id;
   char hash[20];
   int next_expected;
+  flag downloaded;
   size_t total_data;
   bt_peer_t *peer;
   bt_peer_list *peers;
@@ -60,19 +61,19 @@ typedef struct bt_sender_list {
   char hash[20];
   packet **packets;
   int num_packets;
-  
+
   int last_acked;
   int last_sent;
-  
+
   int window_size;
   int recvd;
   int ssthresh;
-  
+
   flag state; // start or avoid
   char retransmit; // counter
   time_t sent_time; // timeouts
   // char dropped; // counter -- needed?
-  
+
   bt_peer_t *peer;
   struct bt_sender_list *prev;
   struct bt_sender_list *next;

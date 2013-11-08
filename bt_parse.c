@@ -261,14 +261,14 @@ void add_packet_list(bt_chunk_list *chunk, int seq_num, char *data, int data_len
       newp->recv = 0;
       newp->data = NULL;
     }
-    
+
     newp->next = NULL;
-    
+
     if (chunk->packets == NULL) {
       chunk->packets = newp;
     }
     else prev->next = newp;
-    
+
     prev = newp;
   }
   chunk->total_data += data_len;
@@ -307,6 +307,7 @@ void add_receiver_list(bt_config_t *c, char *hash, int id) {
   memcpy(chunk->hash, hash, 20);
   chunk->id = id;
   chunk->next_expected = INIT_SEQNUM;
+  chunk->downloaded = 0;
   chunk->total_data = 0;
   chunk->peer = NULL;
   chunk->peers = NULL;
