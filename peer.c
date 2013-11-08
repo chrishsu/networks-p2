@@ -235,7 +235,7 @@ void peer_cc(bt_config_t *config) {
     int cc = 0;
     // lost packet
     if (sender->retransmit >= 2) {
-      DPRINTF(DEBUG_INIT, "Retransmitting %d\n", sender->last_acked);
+      DPRINTF(DEBUG_INIT, "Retransmitting #%d\n", sender->last_acked + 1);
       //sender->retransmit = 0;
       sender->dropped++;
       cc = 1;
@@ -243,7 +243,7 @@ void peer_cc(bt_config_t *config) {
 
     // timeout
     if (difftime(time(NULL), sender->sent_time) > CC_TIMEOUT && sender->sent_time != 0) {
-      DPRINTF(DEBUG_INIT, "Timeout on %d\n", sender->last_acked);
+      DPRINTF(DEBUG_INIT, "Timeout on #%d\n", sender->last_acked + 1);
       sender->dropped++;
       cc = 1;
     }
@@ -263,7 +263,7 @@ void peer_cc(bt_config_t *config) {
       if (sender->ssthresh < 2) sender->ssthresh = 2;
       sender->window_size = 1;
       update_window_size(config, sender);
-      packet_sender(sender, sender->last_acked);
+      packet_sender(sender, sender->last_acked + 1);
       continue;
     }
 
