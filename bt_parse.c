@@ -311,11 +311,12 @@ void add_receiver_list(bt_config_t *c, char *hash, int id) {
   chunk->next_expected = INIT_SEQNUM;
 
   if (has_chunk(hash, c) != -1) {
-    printf("I already have chunk %d!\n", id);
+    //printf("I already have chunk %d!\n", id);
     chunk->total_data = BT_CHUNK_SIZE;
     chunk->downloaded = 1;
+    c->num_downloaded++;
   } else {
-    printf("Don't have chunk %d.\n", id);
+    //printf("Don't have chunk %d.\n", id);
     chunk->total_data = 0;
     chunk->downloaded = 0;
   }

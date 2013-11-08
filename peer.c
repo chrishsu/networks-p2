@@ -142,12 +142,17 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   config->num_downloaded = 0;
   strcpy(config->get_chunk_file, chunkfile);
   while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
-    printf("Adding chunk with id %d and hash %s\n", id, hash_text);
+    //printf("Adding chunk with id %d and hash %s\n", id, hash_text);
     hex2binary(hash_text, 40, hash);
     add_receiver_list(config, (char *)hash, id);
   }
 
   send_whohas(sock, config);
+
+  if (config->num_downloaded == config->num_chunks) {
+    // DONE early!!! :)
+    finish_get(config);
+  }
 }
 
 void handle_user_input(int sock, char *line, bt_config_t *config) {

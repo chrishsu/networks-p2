@@ -46,7 +46,6 @@ void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   bt_peer_list *cur = chunk->peers;
   while (cur != NULL) {
     if (!cur->peer->downloading && !is_bad(cur->peer)) {
-      printf("try_to_get!\n");
       send_get(sock, &(cur->peer->addr), chunk, config);
       return;
     }
@@ -62,6 +61,9 @@ void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
  * @return 0 on success, -1 on error
  */
 int send_whohas(int sock, bt_config_t *config) {
+  if (config->download == NULL) {
+    return 0;
+  }
   if (time_millis() - config->last_whohas < WHOHAS_MILLIS) {
     //DPRINTF(DEBUG_INIT, "Canceling WHOHAS\n");
     return 0;
@@ -104,7 +106,13 @@ int send_whohas(int sock, bt_config_t *config) {
 // Can't assume that downloading just started! This might be
 // after we've been downloading for a while and a peer when down.
 int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
+  if (config->download == NULL) {
+    DPRINTF(DEBUG_INIT, "Quitting IHAVE\n");
+    return 0;
+  }
+
   DPRINTF(DEBUG_INIT, "Process IHAVE\n");
+
   bt_peer_t *peer = peer_with_addr(from, config);
   peer->consec_timeouts = 0;
   peer->bad_time = 0;
@@ -322,11 +330,13 @@ void get_all_the_thingz(int sock, bt_config_t *config) {
     memcpy(copyhash, chunk->hash, 20);
     binary2hex(copyhash, 20, texthash);
 
+    /*
     printf("chunk %d: \n", chunk->id);
     printf("\thash: %s\n", texthash);
     printf("\tdownloaded: %d\n", chunk->downloaded);
     printf("\ttotal_data: %d\n", (int)chunk->total_data);
     printf("\t(has a) peer: %d\n", (chunk->peer != NULL));
+    */
 
     int all_bad = 1;
     if (!chunk->downloaded && chunk->peer == NULL) {
@@ -337,7 +347,7 @@ void get_all_the_thingz(int sock, bt_config_t *config) {
 	if (!peer_list->peer->downloading && !is_bad(peer_list->peer)) {
 	  //printf("Current time: %lld\n", time_millis());
 	  //printf("Bad time: %lld\n", peer_list->peer->bad_time);
-	  printf("GETting from get_all...\n");
+	  //printf("GETting from get_all...\n");
 	  send_get(sock, &(peer_list->peer->addr), chunk, config);
 	  break;
 	}
@@ -385,10 +395,15 @@ void finish_get(bt_config_t *config) {
   for (next_chunk = 0; next_chunk < config->num_chunks; next_chunk++) {
     bt_chunk_list *next = chunk_with_id(next_chunk, config);
 
-    if (0 && has_chunk(next->hash, config) != -1) {
-      printf("I own chunk %d!\n", next->id);
+    int real_id = has_chunk(next->hash, config);
+    if (real_id != -1) {
+      char texthash[41];
+      uint8_t copyhash[20];
+      memcpy(copyhash, next->hash, 20);
+      binary2hex(copyhash, 20, texthash);
+      //printf("I own chunk %d: %s!\n", real_id, texthash);
 
-      int id = next->id;
+      int id = next_chunk;//next->id;
       char filename[255];
       uint8_t filechunk[BT_CHUNK_SIZE];
       size_t read_bytes;
@@ -404,7 +419,7 @@ void finish_get(bt_config_t *config) {
 	return;
       }
 
-      if (fseek(master, id*BT_CHUNK_SIZE, SEEK_SET) != 0) {
+      if (fseek(master, real_id * BT_CHUNK_SIZE, SEEK_SET) != 0) {
 	fprintf(stderr, "Error in fseek!\n");
 	return;
       }
@@ -466,7 +481,7 @@ int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *con
   int next_expected = add_packet(sock, chunk, p, config);
   // Careful, add_packet might have freed this stuff:
   //printf("Got %d, next expected if any: %d\n", ntohl(p->header.seq_num), chunk->next_expected);
-  printf("\tSending ACK %d to peer %d\n", next_expected - 1, peer->id);
+  //printf("\tSending ACK %d to peer %d\n", next_expected - 1, peer->id);
   send_ack(sock, from, next_expected - 1);
 
   return 0;
