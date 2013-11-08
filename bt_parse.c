@@ -396,7 +396,7 @@ void del_sender_list(bt_config_t *c, bt_sender_list *sender) {
   if (sender->packets != NULL) {
     int i;
     for (i = 0; i < sender->num_packets; i++) {
-      if (sender->packets[i] != NULL) free(sender->packets[i]);
+      if (sender->packets[i] != NULL) free_packet(sender->packets[i]);
     }
     free(sender->packets);
   }
@@ -481,7 +481,8 @@ bt_peer_t *peer_with_addr(struct sockaddr_in *addr, bt_config_t *config) {
 void reset_peers(bt_config_t *config) {
   bt_peer_t *cur = config->peers;
   while (cur != NULL) {
-    cur->bad = 0;
+    cur->consec_timeouts = 0;
+    cur->bad_time = 0;
     cur->chunk = NULL;
     cur->downloading = 0;
     // Not expecting response:

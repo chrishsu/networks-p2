@@ -47,6 +47,7 @@ typedef struct chunk_list {
 
 long long time_millis();
 chunk_list *init_chunk_list();
+void free_packet(packet *p);
 chunk_list *add_to_chunk_list(chunk_list *list, char *hash);
 int chunk_list_len(chunk_list *list);
 void del_chunk_list(chunk_list *list);

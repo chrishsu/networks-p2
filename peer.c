@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 #include "debug.h"
 #include "spiffy.h"
 #include "bt_parse.h"
@@ -89,7 +90,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
   p.buf = malloc(ntohs(p.header.packet_len) - ntohs(p.header.header_len));
   memcpy(p.buf, buf + ntohs(p.header.header_len), ntohs(p.header.packet_len) - ntohs(p.header.header_len));
 
-  printf("Incoming message from %s:%d\n",
+  DPRINTF(DEBUG_INIT, "Incoming message from %s:%d\n",
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port));
 
@@ -127,7 +128,7 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   FILE *CFILE;
   CFILE = fopen(chunkfile, "r");
   if (CFILE == NULL) {
-    printf("No chunkfile!\n");
+    fprintf(stderr, "No chunkfile!\n");
     return;
   }
   int id;
@@ -135,9 +136,11 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   uint8_t hash[20];
 
   reset_peers(config);
+  strcpy(config->output_file, outputfile);
   config->num_chunks = 0;
   config->cur_download = 0;
   config->num_downloaded = 0;
+  strcpy(config->get_chunk_file, chunkfile);
   while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
     hex2binary(hash_text, 40, hash);
     add_receiver_list(config, (char *)hash, id);
@@ -154,7 +157,6 @@ void handle_user_input(int sock, char *line, bt_config_t *config) {
 
   if (sscanf(line, "GET %120s %120s", chunkf, outf)) {
     if (strlen(outf) > 0) {
-      printf("\nReceived!\n");
       process_user_get(sock, chunkf, outf, config);
     }
     else {
@@ -172,7 +174,8 @@ void peer_packet_ops(int sock) {
   DPRINTF(DEBUG_INIT, "sent %d bytes\n", (int)bytes_sent);
   //printf("here %d!\n", (int)bytes_sent);
   if (bytes_sent < 0) {
-    fprintf(stderr, "Error sending packet\n");
+    fprintf(stderr, "Error sending packet: %d\n", errno);
+    fprintf(stderr, "EINTrR = %d, EINVAL = %d\n", EINTR, EINVAL);
   } else {
     size_t new_len = pq->len - bytes_sent;
     if (new_len > 0) {
@@ -190,7 +193,7 @@ void peer_packet_ops(int sock) {
  * @param start Sequence number to start at
  */
 void packet_sender(bt_sender_list *sender, int start) {
-  printf("packet_sender: %d\n", start);
+  DPRINTF(DEBUG_INIT, "packet_sender: %d\n", start);
   if (sender->packets == NULL) {
     DPRINTF(DEBUG_INIT, "sender->packets empty :(\n");
     return;
@@ -207,7 +210,7 @@ void packet_sender(bt_sender_list *sender, int start) {
       DPRINTF(DEBUG_INIT, "sender->packets[%d] empty :(", i);
       return;
     }
-    printf("\tAdding #%d\n", ntohl(sender->packets[i]->header.seq_num));
+    //printf("\tAdding #%d\n", ntohl(sender->packets[i]->header.seq_num));
     packet_new(sender->packets[i], &(sender->peer->addr));
   }
   sender->sent_time = time(NULL);
@@ -251,7 +254,7 @@ void peer_cc(bt_config_t *config) {
       sender = tmp;
       continue;
     }
-    
+
     // update window size
     if (cc) {
       if (sender->state == 1) sender->state = 0;

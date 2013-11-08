@@ -10,6 +10,14 @@ long long time_millis() {
   return millis;
 }
 
+void free_packet(packet *p) {
+  if (p == NULL)
+    return;
+  if (p->buf != NULL)
+    free(p->buf);
+  free(p);
+}
+
 chunk_list *init_chunk_list() {
   return NULL;
 }

@@ -1,19 +1,33 @@
 #include "peer_receiver.h"
 #include "sha.h"
 
+#define MAX_TIMEOUTS 3
+#define BAD_RESET_MILLIS (30 * 1000)
+
 void timeout_check(int sock, bt_config_t *config) {
   long long cur_time = time_millis();
   bt_peer_t *cur = config->peers;
   while (cur != NULL) {
     if (cur->last_response != -1 &&
 	cur_time - cur->last_response > TIMEOUT_MILLIS) {
-      cur->bad = 1;
-      cur->downloading = 0;
-      cur->chunk->peer = NULL;
-      cur->chunk = NULL;
+      cur->consec_timeouts++;
+
+      if (cur->consec_timeouts >= MAX_TIMEOUTS) {
+	DPRINTF(DEBUG_INIT, "Timed out too many times! Calling it bad now!\n");
+	cur->bad_time = time_millis();
+	cur->downloading = 0;
+	cur->chunk->peer = NULL;
+	del_packet_list(cur->chunk);
+	cur->chunk = NULL;
+      }
     }
     cur = cur->next;
   }
+}
+
+int is_bad(bt_peer_t *peer) {
+  return peer->bad_time != 0 &&
+         (time_millis() - peer->bad_time >= BAD_RESET_MILLIS);
 }
 
 void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
@@ -22,7 +36,7 @@ void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   }
   bt_peer_list *cur = chunk->peers;
   while (cur != NULL) {
-    if (!cur->peer->downloading && !cur->peer->bad) {
+    if (!cur->peer->downloading && !is_bad(cur->peer)) {
       send_get(sock, &(cur->peer->addr), chunk, config);
       return;
     }
@@ -74,13 +88,14 @@ int send_whohas(int sock, bt_config_t *config) {
 // Can't assume that downloading just started! This might be
 // after we've been downloading for a while and a peer when down.
 int process_ihave(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
-  printf("Process IHAVE\n");
+  DPRINTF(DEBUG_INIT, "Process IHAVE\n");
   bt_peer_t *peer = peer_with_addr(from, config);
-  peer->bad = 0;
+  peer->consec_timeouts = 0;
+  peer->bad_time = 0;
 
   short datalen = ntohs(p->header.packet_len) - sizeof(packet_head);
   char numchunks = p->buf[0];
-  printf("numchunks = %d\n", numchunks);
+  DPRINTF(DEBUG_INIT, "numchunks = %d\n", numchunks);
   datalen -= 4; // We already read the number of chunks
   char *nextchunk = p->buf + 4;
   char i;
@@ -151,7 +166,7 @@ int send_get(int sock, struct sockaddr_in *to, bt_chunk_list *chunk, bt_config_t
 /**
  * Assumes you gave it a valid seq_num. If not, bad stuff happens like infinite mallocing o_O
  */
-void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) {
+int add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) {
   DPRINTF(DEBUG_INIT, "Add packet #%d\n", ntohl(p->header.seq_num));
   int seq_num = ntohl(p->header.seq_num);
   size_t data_len = ntohs(p->header.packet_len) - sizeof(packet_head);
@@ -159,14 +174,17 @@ void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config) 
   // Well that's a lot shorter now! Thanks Chris! :)
   add_packet_list(chunk, seq_num, p->buf, data_len);
 
-  printf("Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
-  printf("Next expected: %d\n", chunk->next_expected);
+  DPRINTF(DEBUG_INIT, "Total received: %d, total expected: %d\n", (int)chunk->total_data, (int)BT_CHUNK_SIZE);
+  DPRINTF(DEBUG_INIT, "Next expected: %d\n", chunk->next_expected);
+  // We may end up freeing everything, so save this:
+  int next_expected = chunk->next_expected;
 
   // Put this into process_data because
   // we want to send the ack before doing this:
   if (chunk->total_data == BT_CHUNK_SIZE) {
     finish_chunk(sock, chunk, config);
   }
+  return next_expected;
 }
 
 int master_chunk(char *hash, bt_config_t *config) {
@@ -229,11 +247,9 @@ void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   char hash_text[41];
   memcpy(hash, chunk->hash, 20);
   binary2hex(hash, 20, hash_text);
-  printf("getting chunk_id...\n");
   int chunk_id = master_chunk(chunk->hash, config);
   fprintf(hcf, "%d %s\n", chunk_id, hash_text);
   fclose(hcf);
-  printf("Recorded getting chunk with id %d\n", chunk_id);
 
   // We have another chunk now:
   config->num_downloaded++;
@@ -267,6 +283,12 @@ void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config) {
   }
 }
 
+/**
+ * @param sock Socket to send out of
+ * @param config Config
+ * Examines every chunk and tries to see if it's possible
+ * to GET it.
+ */
 void get_all_the_thingz(int sock, bt_config_t *config) {
   bt_chunk_list *chunk = config->download;
   // Technically don't need to check max_conn, since send_get
@@ -275,10 +297,10 @@ void get_all_the_thingz(int sock, bt_config_t *config) {
     if (!chunk->downloaded && chunk->peer == NULL) {
       bt_peer_list *peer_list = chunk->peers;
       while (peer_list != NULL) {
-	if (peer_list->peer->downloading || peer_list->peer->bad)
-	  continue;
-	send_get(sock, &(peer_list->peer->addr), chunk, config);
-	break;
+	if (!peer_list->peer->downloading && !is_bad(peer_list->peer)) {
+	  send_get(sock, &(peer_list->peer->addr), chunk, config);
+	  break;
+	}
 	peer_list = peer_list->next;
       }
     }
@@ -286,6 +308,11 @@ void get_all_the_thingz(int sock, bt_config_t *config) {
   }
 }
 
+/**
+ * @param id Chunk ID
+ * @param config Config
+ * @return The chunk with the given ID.
+ */
 bt_chunk_list *chunk_with_id(int id, bt_config_t *config) {
   bt_chunk_list *cur = config->download;
   while (cur != NULL) {
@@ -296,11 +323,18 @@ bt_chunk_list *chunk_with_id(int id, bt_config_t *config) {
   return NULL;
 }
 
+/**
+ * @param config Config
+ * Finishes up a user GET request:
+ */
 void finish_get(bt_config_t *config) {
+  DPRINTF(DEBUG_INIT, "finish_get!!!\n");
   FILE *outfile = fopen(config->output_file, "wb");
   if (!outfile) {
     fprintf(stderr, "Error opening output file!\n");
     return;
+  } else {
+    DPRINTF(DEBUG_INIT, "Opened '%s'\n", config->output_file);
   }
   int next_chunk;
   for (next_chunk = 0; next_chunk < config->num_chunks; next_chunk++) {
@@ -309,6 +343,7 @@ void finish_get(bt_config_t *config) {
   }
   fclose(outfile);
 
+  printf("GOT %s\n", config->get_chunk_file);
   del_receiver_list(config);
 }
 
@@ -316,6 +351,10 @@ void finish_get(bt_config_t *config) {
  * Adds the data to the master chunk_list, sends an ACK as well.
  */
 int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
+  bt_peer_t *peer = peer_with_addr(from, config);
+  peer->consec_timeouts = 0;
+  peer->bad_time = 0;
+
   DPRINTF(DEBUG_INIT, "process_data...\n");
   int seq_num = ntohl(p->header.seq_num);
   if (seq_num > MAX_SEQNUM || seq_num < INIT_SEQNUM) {
@@ -323,15 +362,15 @@ int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *con
     return -1;
   }
 
-  bt_peer_t *peer = peer_with_addr(from, config);
   if (peer == NULL) {
     fprintf(stderr, "Peer not found :(\n");
     return -1;
   }
   bt_chunk_list *chunk = peer->chunk;
-  add_packet(sock, chunk, p, config);
-  printf("Next Expected: %d\n", chunk->next_expected);
-  send_ack(sock, from, chunk->next_expected - 1);
+  int next_expected = add_packet(sock, chunk, p, config);
+  // Careful, add_packet might have freed this stuff:
+  //printf("Got %d, next expected if any: %d\n", ntohl(p->header.seq_num), chunk->next_expected);
+  send_ack(sock, from, next_expected - 1);
 
   return 0;
 }
@@ -351,6 +390,7 @@ int send_ack(int sock, struct sockaddr_in *to, int ack_num) {
  */
 void write_to_file(bt_packet_list *packets, FILE *outfile) {
   while (packets != NULL) {
+    DPRINTF(DEBUG_INIT, "Writing %d bytes to file...\n", (int)packets->data_len);
     fwrite(packets->data, sizeof(char), packets->data_len, outfile);
     packets = packets->next;
   }

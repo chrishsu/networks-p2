@@ -175,8 +175,6 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
     fprintf(stderr, "Error opening master-data-file '%s'\n", filename);
     return -1;
   }
-  else
-    printf("Opened MDF: '%s'\n", filename);
 
   if (fseek(master, id*BT_CHUNK_SIZE, SEEK_SET) != 0) {
     fprintf(stderr, "Error in fseek!\n");

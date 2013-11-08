@@ -25,7 +25,13 @@ typedef struct bt_peer_s {
   short id;
   // True iff we're downloading from this peer:
   flag downloading;
-  flag bad;
+
+  // Number of consecutive timeouts
+  int consec_timeouts;
+  // Time at which the peer was declared bad:
+  // for example, it crashed or is busy
+  long long bad_time;
+
   long long last_response;
   struct bt_chunk_list *chunk;
   struct sockaddr_in addr;
@@ -84,6 +90,7 @@ struct bt_config_s {
   char  has_chunk_file[BT_FILENAME_LEN];
   char  output_file[BT_FILENAME_LEN];
   char  peer_list_file[BT_FILENAME_LEN];
+  char  get_chunk_file[BT_FILENAME_LEN];
   int   max_conn;
   short identity;
   unsigned short myport;

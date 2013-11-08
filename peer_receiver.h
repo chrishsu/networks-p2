@@ -21,6 +21,7 @@
 #define TIMEOUT_MILLIS 2000
 
 void timeout_check(int sock, bt_config_t *config);
+int is_bad(bt_peer_t *peer);
 void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config);
 
 int send_whohas(int sock, bt_config_t *config);
@@ -50,7 +51,7 @@ int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *con
  */
 int send_ack(int sock, struct sockaddr_in *to, int ack_num);
 
-void add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config);
+int add_packet(int sock, bt_chunk_list *chunk, packet *p, bt_config_t *config);
 void finish_chunk(int sock, bt_chunk_list *chunk, bt_config_t *config);
 bt_chunk_list *chunk_with_id(int id, bt_config_t *config);
 void finish_get(bt_config_t *config);
