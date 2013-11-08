@@ -39,6 +39,8 @@ void bt_init(bt_config_t *config, int argc, char **argv) {
   config->download = NULL;
   config->download_tail = NULL;
   config->upload = NULL;
+  
+  config->start_time = time_millis();
 }
 
 void bt_usage() {

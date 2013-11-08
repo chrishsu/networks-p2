@@ -241,6 +241,20 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
   return 0;
 }
 
+void update_window_size(bt_config_t *c, bt_sender_list *sender) {
+  FILE *output = fopen("problem2-peer.txt", "w");
+  if (output == NULL) {
+    fprintf(stderr, "Error opening problem2-peer.txt\n");
+    return;
+  }
+  
+  long long diff = time_millis() - c->start_time;
+  
+  fprintf(output, "f%d\t%lld\t%d",
+          sender->peer->id, diff, sender->window_size);
+  fclose(output);
+}
+
 /**
  * Processes ACK with connection_list.
  * Portion of congestion control (slow start & congestion avoidance) with increases in window_size.
@@ -283,6 +297,7 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
   if (sender->state == 0) { //CC_START
     // Increase window size by 1
     sender->window_size++;
+    update_window_size(config, sender);
     if (sender->window_size > sender->ssthresh) sender->state = 1;
   }
   /* Congestion Avoidance */
@@ -290,6 +305,7 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
     sender->recvd++;
     if (sender->recvd == sender->window_size) {
       sender->window_size++;
+      update_window_size(config, sender);
       sender->recvd = 0;
     }
   }
