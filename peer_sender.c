@@ -118,6 +118,14 @@ int process_get(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
   int ret;
   DPRINTF(DEBUG_INIT, "Process GET\n");
 
+  // From sockaddr
+  bt_peer_t *peer = peer_with_addr(from, config);
+  if (peer == NULL) return -1;
+  if (find_sender_list(config, peer) != NULL) {
+    fprintf(stderr, "Already uploading to peer %d\n", peer->id);
+    return -1;
+  }
+
   // Only expecting 20 bytes
   if (ntohs(p->header.packet_len) - ntohs(p->header.header_len) != 20) {
     fprintf(stderr, "Didn't get 20 bytes for the hash!\n");
@@ -261,6 +269,8 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
   }
   if (sender->last_acked < ntohl(p->header.ack_num)) {
     sender->last_acked = ntohl(p->header.ack_num);
+    sender->retransmit = 0;
+    sender->dropped = 0;
   }
   if (sender->last_acked > ntohl(p->header.ack_num)) {
     // Probably not good.

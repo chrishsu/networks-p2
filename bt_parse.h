@@ -71,7 +71,7 @@ typedef struct bt_sender_list {
   flag state; // start or avoid
   char retransmit; // counter
   time_t sent_time; // timeouts
-  // char dropped; // counter -- needed?
+  char dropped; // counter -- needed?
   
   bt_peer_t *peer;
   struct bt_sender_list *prev;
