@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
 
 
 void process_inbound_udp(int sock, bt_config_t *config) {
-  DPRINTF(DEBUG_INIT, "process_inbound_udp\n");
+  //DPRINTF(DEBUG_INIT, "process_inbound_udp\n");
   #define BUFLEN 1500
   struct sockaddr_in from;
   socklen_t fromlen;
@@ -74,7 +74,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
     return;
   }
 
-  DPRINTF(DEBUG_INIT, "Read packet!\n");
+  //DPRINTF(DEBUG_INIT, "Read packet!\n");
   packet p;
   memcpy(&p.header, buf, sizeof(packet_head));
   if (ntohs(p.header.packet_len) != bytes_read) {
@@ -94,7 +94,7 @@ void process_inbound_udp(int sock, bt_config_t *config) {
 	 inet_ntoa(from.sin_addr),
 	 ntohs(from.sin_port));
 
-  DPRINTF(DEBUG_INIT, "\n\nSwitching: %d\n", (int)p.header.type);
+  //DPRINTF(DEBUG_INIT, "\n\nSwitching: %d\n", (int)p.header.type);
   switch(p.header.type) {
   case TYPE_WHOHAS:
     process_whohas(sock, &from, &p, config);
@@ -142,6 +142,7 @@ void process_user_get(int sock, char *chunkfile, char *outputfile, bt_config_t *
   config->num_downloaded = 0;
   strcpy(config->get_chunk_file, chunkfile);
   while (fscanf(CFILE, "%d %s", &id, hash_text) == 2) {
+    printf("Adding chunk with id %d and hash %s\n", id, hash_text);
     hex2binary(hash_text, 40, hash);
     add_receiver_list(config, (char *)hash, id);
   }
@@ -325,6 +326,7 @@ void peer_run(bt_config_t *config) {
 
     timeout_check(sock, config);
     get_all_the_thingz(sock, config);
+    peer_cc(config);
 
     if (nfds > 0) {
       if (FD_ISSET(sock, &writefds)) {
@@ -333,7 +335,7 @@ void peer_run(bt_config_t *config) {
       }
 
       if (FD_ISSET(sock, &readfds)) {
-        DPRINTF(DEBUG_INIT, "Got packet!\n\n");
+        //DPRINTF(DEBUG_INIT, "Got packet!\n\n");
         process_inbound_udp(sock, config);
       }
 
@@ -342,6 +344,6 @@ void peer_run(bt_config_t *config) {
       }
     }
 
-    peer_cc(config);
+    //   peer_cc(config);
   }
 }

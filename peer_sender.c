@@ -43,7 +43,7 @@ int process_whohas(int sock, struct sockaddr_in *from, packet *p, bt_config_t *c
   */
 
   ret = send_ihave(sock, from, chunks, config);
-  DPRINTF(DEBUG_INIT, "Called send_ihave\n");
+  //DPRINTF(DEBUG_INIT, "Called send_ihave\n");
 
   //cleanup
   del_chunk_list(chunks);
@@ -247,9 +247,9 @@ void update_window_size(bt_config_t *c, bt_sender_list *sender) {
     fprintf(stderr, "Error opening problem2-peer.txt\n");
     return;
   }
-  
+
   long long diff = time_millis() - c->start_time;
-  
+
   fprintf(output, "f%d\t%lld\t%d\n",
           sender->peer->id, diff, sender->window_size);
   fclose(output);
@@ -267,8 +267,12 @@ void update_window_size(bt_config_t *c, bt_sender_list *sender) {
  * @return -1 on error, or else 0.
  */
 int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config) {
-  DPRINTF(DEBUG_INIT, "Process ACK #%d\n", ntohl(p->header.ack_num));
   bt_peer_t *peer = peer_with_addr(from, config);
+  if (peer == NULL) {
+    DPRINTF(DEBUG_INIT, "Throwing out ack from unknown peer.\n");
+    return 0;
+  }
+  DPRINTF(DEBUG_INIT, "Process ACK %d from peer %d\n", ntohl(p->header.ack_num), peer->id);
   if (peer == NULL) {
     fprintf(stderr, "Didn't find a peer!\n");
     return -1;
@@ -290,6 +294,7 @@ int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *conf
     sender->dropped = 0;
   }
   if (sender->last_acked > ntohl(p->header.ack_num)) {
+    DPRINTF(DEBUG_INIT, "Uh oh?\n");
     // Probably not good.
   }
 

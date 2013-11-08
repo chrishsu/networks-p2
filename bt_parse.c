@@ -310,13 +310,16 @@ void add_receiver_list(bt_config_t *c, char *hash, int id) {
   chunk->id = id;
   chunk->next_expected = INIT_SEQNUM;
 
-  if (has_chunk(hash, c)) {
+  if (has_chunk(hash, c) != -1) {
+    printf("I already have chunk %d!\n", id);
     chunk->total_data = BT_CHUNK_SIZE;
     chunk->downloaded = 1;
-  } else
+  } else {
+    printf("Don't have chunk %d.\n", id);
+    chunk->total_data = 0;
     chunk->downloaded = 0;
+  }
 
-  chunk->total_data = 0;
   chunk->peer = NULL;
   chunk->peers = NULL;
   chunk->packets = NULL;
@@ -440,6 +443,12 @@ int master_data_file(char *file, bt_config_t *config) {
  * @return The ID if this peer has the hash, -1 otherwise.
  */
 int has_chunk(char *hash, bt_config_t *config) {
+  uint8_t copyhash[20];
+  memcpy(copyhash, hash, 20);
+  char texthash[41];
+  binary2hex(copyhash, 20, texthash);
+  DPRINTF(DEBUG_INIT, "Searching for hash '%s'\n", texthash);
+
   FILE *has_chunk_file = fopen(config->has_chunk_file, "r");
   if (has_chunk_file == NULL) {
     fprintf(stderr, "Error opening has-chunk-file\n");
@@ -457,6 +466,8 @@ int has_chunk(char *hash, bt_config_t *config) {
 
     if (hash_equal(hash, (char *)binary))
       break;
+    else
+      id = -1;
   }
   fclose(has_chunk_file);
   return id;

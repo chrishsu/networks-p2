@@ -18,7 +18,11 @@
 
 #define INIT_SEQNUM 1
 #define MAX_SEQNUM (INIT_SEQNUM - 1 + BT_CHUNK_SIZE)
-#define TIMEOUT_MILLIS 2000
+
+#define TIMEOUT_MILLIS (15 * 1000)
+#define MAX_TIMEOUTS 5
+#define BAD_RESET_MILLIS (30 * 1000)
+#define WHOHAS_MILLIS (15 * 1000)
 
 void timeout_check(int sock, bt_config_t *config);
 int is_bad(bt_peer_t *peer);
