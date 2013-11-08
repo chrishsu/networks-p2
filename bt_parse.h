@@ -94,6 +94,7 @@ struct bt_config_s {
   int   max_conn;
   short identity;
   unsigned short myport;
+  long long start_time;
 
   int argc;
   char **argv;

@@ -40,4 +40,6 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
  */
 int process_ack(int sock, struct sockaddr_in *from, packet *p, bt_config_t *config);
 
+void update_window_size(bt_config_t *c, bt_sender_list *sender);
+
 #endif

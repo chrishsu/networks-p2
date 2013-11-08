@@ -40,6 +40,7 @@ void bt_init(bt_config_t *config, int argc, char **argv) {
   config->download_tail = NULL;
   config->upload = NULL;
   config->last_whohas = 0;
+  config->start_time = time_millis();
 }
 
 void bt_usage() {
