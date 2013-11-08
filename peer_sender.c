@@ -242,7 +242,7 @@ int send_data(int sock, struct sockaddr_in *to, char *hash, bt_config_t *config)
 }
 
 void update_window_size(bt_config_t *c, bt_sender_list *sender) {
-  FILE *output = fopen("problem2-peer.txt", "w");
+  FILE *output = fopen("problem2-peer.txt", "a");
   if (output == NULL) {
     fprintf(stderr, "Error opening problem2-peer.txt\n");
     return;
@@ -250,7 +250,7 @@ void update_window_size(bt_config_t *c, bt_sender_list *sender) {
   
   long long diff = time_millis() - c->start_time;
   
-  fprintf(output, "f%d\t%lld\t%d",
+  fprintf(output, "f%d\t%lld\t%d\n",
           sender->peer->id, diff, sender->window_size);
   fclose(output);
 }
