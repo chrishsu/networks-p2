@@ -39,6 +39,7 @@ void bt_init(bt_config_t *config, int argc, char **argv) {
   config->download = NULL;
   config->download_tail = NULL;
   config->upload = NULL;
+  config->last_whohas = 0;
 }
 
 void bt_usage() {
@@ -307,7 +308,13 @@ void add_receiver_list(bt_config_t *c, char *hash, int id) {
   memcpy(chunk->hash, hash, 20);
   chunk->id = id;
   chunk->next_expected = INIT_SEQNUM;
-  chunk->downloaded = 0;
+
+  if (has_chunk(hash, c)) {
+    chunk->total_data = BT_CHUNK_SIZE;
+    chunk->downloaded = 1;
+  } else
+    chunk->downloaded = 0;
+
   chunk->total_data = 0;
   chunk->peer = NULL;
   chunk->peers = NULL;

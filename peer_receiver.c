@@ -1,22 +1,30 @@
 #include "peer_receiver.h"
 #include "sha.h"
 
-#define MAX_TIMEOUTS 3
-#define BAD_RESET_MILLIS (30 * 1000)
+#define MAX_TIMEOUTS 5
+#define BAD_RESET_MILLIS (20 * 1000)
+#define WHOHAS_MILLIS (20 * 1000)
 
 void timeout_check(int sock, bt_config_t *config) {
+  if (config->download == NULL)
+    return;
+
   long long cur_time = time_millis();
+  //printf("Time = %lld\n", cur_time);
   bt_peer_t *cur = config->peers;
   while (cur != NULL) {
+    //printf("last_response: %lld\n", cur->last_response);
     if (cur->last_response != -1 &&
 	cur_time - cur->last_response > TIMEOUT_MILLIS) {
       cur->consec_timeouts++;
+      printf("Now %d timeouts\n", cur->consec_timeouts);
 
       if (cur->consec_timeouts >= MAX_TIMEOUTS) {
 	DPRINTF(DEBUG_INIT, "Timed out too many times! Calling it bad now!\n");
 	cur->bad_time = time_millis();
 	cur->downloading = 0;
 	cur->chunk->peer = NULL;
+	cur->last_response = -1;
 	del_packet_list(cur->chunk);
 	cur->chunk = NULL;
       }
@@ -27,7 +35,7 @@ void timeout_check(int sock, bt_config_t *config) {
 
 int is_bad(bt_peer_t *peer) {
   return peer->bad_time != 0 &&
-         (time_millis() - peer->bad_time >= BAD_RESET_MILLIS);
+         (time_millis() - peer->bad_time < BAD_RESET_MILLIS);
 }
 
 void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
@@ -52,6 +60,12 @@ void try_to_get(int sock, bt_chunk_list *chunk, bt_config_t *config) {
  * @return 0 on success, -1 on error
  */
 int send_whohas(int sock, bt_config_t *config) {
+  if (time_millis() - config->last_whohas < WHOHAS_MILLIS) {
+    //DPRINTF(DEBUG_INIT, "Canceling WHOHAS\n");
+    return 0;
+  }
+  config->last_whohas = time_millis();
+
   DPRINTF(DEBUG_INIT, "Send WHOHAS\n");
     packet p;
 
@@ -149,6 +163,7 @@ int send_get(int sock, struct sockaddr_in *to, bt_chunk_list *chunk, bt_config_t
   bt_peer_t *sending_peer = peer_with_addr(to, config);
   sending_peer->chunk = chunk;
   sending_peer->downloading = 1;
+  sending_peer->last_response = time_millis();
   chunk->peer = sending_peer;
   chunk->next_expected = INIT_SEQNUM;
   chunk->packets = NULL;
@@ -294,14 +309,22 @@ void get_all_the_thingz(int sock, bt_config_t *config) {
   // Technically don't need to check max_conn, since send_get
   // does nothing if you're full, but it's faster this way:
   while (chunk != NULL && config->cur_download < config->max_conn) {
+    int all_bad = 1;
     if (!chunk->downloaded && chunk->peer == NULL) {
       bt_peer_list *peer_list = chunk->peers;
       while (peer_list != NULL) {
+	if (!is_bad(peer_list->peer))
+	  all_bad = 0;
 	if (!peer_list->peer->downloading && !is_bad(peer_list->peer)) {
+	  printf("Current time: %lld\n", time_millis());
+	  printf("Bad time: %lld\n", peer_list->peer->bad_time);
 	  send_get(sock, &(peer_list->peer->addr), chunk, config);
 	  break;
 	}
 	peer_list = peer_list->next;
+      }
+      if (all_bad) {
+	send_whohas(sock, config);
       }
     }
     chunk = chunk->next;
@@ -336,10 +359,59 @@ void finish_get(bt_config_t *config) {
   } else {
     DPRINTF(DEBUG_INIT, "Opened '%s'\n", config->output_file);
   }
+
+
   int next_chunk;
   for (next_chunk = 0; next_chunk < config->num_chunks; next_chunk++) {
     bt_chunk_list *next = chunk_with_id(next_chunk, config);
-    write_to_file(next->packets, outfile);
+
+    if (has_chunk(next->hash, config)) {
+      int id = next->id;
+      char filename[255];
+      uint8_t filechunk[BT_CHUNK_SIZE];
+      size_t read_bytes;
+      DPRINTF(DEBUG_INIT, "Send DATA\n");
+
+      if (!master_data_file(filename, config)) {
+	fprintf(stderr, "Error getting master data file!\n");
+	return;
+      }
+
+      FILE *master = fopen(filename, "rb");
+      if (master == NULL) {
+	fprintf(stderr, "Error opening master-data-file '%s'\n", filename);
+	return;
+      }
+
+      if (fseek(master, id*BT_CHUNK_SIZE, SEEK_SET) != 0) {
+	fprintf(stderr, "Error in fseek!\n");
+	return;
+      }
+
+      read_bytes = fread(filechunk, sizeof(uint8_t), BT_CHUNK_SIZE, master);
+      if (read_bytes <= 0) {
+	fprintf(stderr, "Read nonpositive number of bytes!\n");
+	return;
+      }
+      DPRINTF(DEBUG_INIT, "Read %d bytes from hash #%d\n", (int)read_bytes, id);
+
+      // Check the hash.
+      uint8_t checkhash[20];
+      shahash(filechunk, BT_CHUNK_SIZE, checkhash);
+      if (!hash_equal(next->hash, (char *) checkhash)) {
+	char dahash1[41];
+	char dahash2[41];
+	binary2hex((uint8_t *)next->hash, 20, dahash1);
+	binary2hex(checkhash, 20, dahash2);
+	fprintf(stderr, "%s != %s\n", dahash1, dahash2);
+	fprintf(stderr, "Chunks not equal!\n");
+	return;
+      }
+
+      fwrite(filechunk, sizeof(char), BT_CHUNK_SIZE, outfile);
+    } else {
+      write_to_file(next->packets, outfile);
+    }
   }
   fclose(outfile);
 
@@ -354,6 +426,7 @@ int process_data(int sock, struct sockaddr_in *from, packet *p, bt_config_t *con
   bt_peer_t *peer = peer_with_addr(from, config);
   peer->consec_timeouts = 0;
   peer->bad_time = 0;
+  peer->last_response = time_millis();
 
   DPRINTF(DEBUG_INIT, "process_data...\n");
   int seq_num = ntohl(p->header.seq_num);

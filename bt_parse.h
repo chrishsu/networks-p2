@@ -107,6 +107,8 @@ struct bt_config_s {
   bt_chunk_list *download;
   bt_chunk_list *download_tail; // DO NOT ACCESS
   bt_sender_list *upload;
+
+  long long last_whohas;
 };
 typedef struct bt_config_s bt_config_t;
 

@@ -9,3 +9,8 @@ from other peers.
 
 Upon receiving a WHOHAS request, the peer checks for the chunks and returns an
 IHAVE response on its UDP port.
+
+FINAL SUBMISSION:
+
+Receiver side:
+Upon getting a GET request, we create a linked list with every chunk that we want to download.
