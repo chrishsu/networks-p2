@@ -4,3 +4,5 @@ TESTS
 + tested with the examples
 + tested bt_parse linked lists
 + tested with Spiffy
+
+We did a fair amount of testing of our queue and linked list functions to make sure they were solid, because a lot of code is based on them. We used the example gifs to test the functionality, testing with 2 other peers (3 total) both with and without spiffy. We also did 1 other peer without spiffy, to be sure that successive chunks could be downloaded.
